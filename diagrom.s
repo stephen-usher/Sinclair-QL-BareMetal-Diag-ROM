@@ -53,6 +53,19 @@
 startsp		equ	$0003FFF0
 
 zx83base	equ	$00018000
+
+zx83rclock	equ	zx83base
+zx83rcstatus	equ	zx83base+$20
+zx83ristatus	equ	zx83base+$21
+zx83rmdvtrk1	equ	zx83base+$22
+zx83rmdvtrk2	equ	zx83base+$23
+
+zx83wtransreg	equ	zx83base+$2
+zx83wipcwr	equ	zx83base+$3
+zx83wmdvreg	equ	zx83base+$20
+zx83wimaskreg	equ	zx83base+$21
+zx83wtrasdata	equ	zx83base+$22
+
 ramstart	equ	$00020000
 basramsiz	equ	$0001FFFF
 
@@ -108,6 +121,10 @@ start:
 	lea	banend,a6	; Put the pointer to the return address into a6
 	bra	noram_print_string
 banend:
+	lea	memtststarttxt,a5
+	lea	memtststartend,a6
+	bra	noram_print_string
+memtststartend:
 	bra	memtest
 endmemtst:
 
@@ -304,8 +321,6 @@ eloopy2:
 	move.w	d0,896(a1)
 	dbeq	d0,eloopy2
 	bra	eloopy
-
-end:	bra end
 
 buserr:
 addresserr:
@@ -692,8 +707,6 @@ itoa_loop2:
 ;
 ;***
 
-init_ipc_start_txt:	dc.b	"Starting initial IPC tests.",$0d,$0a,$0
-
 .align
 
 init_ipc_test:
@@ -703,6 +716,69 @@ init_ipc_test:
 	jsr	prt_str
 
 	movem.l	(SP)+,d0-d7/a0-a6
+	rts
+
+;***
+;
+; read_clock_value - Read the ZX8302 clock.
+;
+; Returns low word in d0 and high word in d1
+;
+;***
+
+read_clock_value:
+	movem.l	d2-d7/a0-a6,-(SP)
+
+	lea	zx83rclock,a0		; Load the address of the RTC base
+	move.w	(a0),d1			; Copy the high word into d1
+	move.w	2(a0),d0		; Copy the low word into d0
+
+	movem.l	(SP)+,d2-d7/a0-a6
+	rts
+
+;***
+;
+; quick_test_clock - Quickly test the clock is running.
+;
+;***
+
+quick_test_clock:
+	movem.l	d0-d7/a0-a6,-(SP)
+
+	lea	qtclocktxt,a0		; Print the testing clock message
+	jsr	prt_str
+
+	jsr	read_clock_value	; Read the clock values into d0 and d1
+
+	move.w	d0,d2			; Copy the low word of the time to d2
+	moveq	#5,d3			; Counter for the number of seconds to wait.
+
+	lea	ser_workspace,a0	; Generate the ASCII representation
+	jsr	itoa
+
+	jsr	prt_str			; Print it
+
+	lea	crlftxt,a0		; Print carriage-return, linefeed
+	jsr	prt_str
+
+quick_test_clock_loop1:
+	jsr	read_clock_value	; Read the clock
+	cmp.w	d0,d2			; Has it changed?
+	beq	quick_test_clock_loop1	; No? Then read it again!
+	subi.b	#1,d3			; Decrement our counter for the number times around the loop
+	tst.b	d3			; Have we reached the end?
+	beq	qtcl1_end		; If yes then finish
+	move.w	d0,d2			; Update the "previous value" of the time
+	lea	ser_workspace,a0	; Generate the ASCII reprisentation
+	jsr	itoa
+	jsr	prt_str			; Print it
+	lea	crlftxt,a0		; Print carriage-return linefeed
+	jsr	prt_str
+	bra	quick_test_clock_loop1	; Go around again
+	
+qtcl1_end:
+
+	movem.l (SP)+,d0-d7/a0-a6
 	rts
 
 ;*****************************************************************************
@@ -720,14 +796,19 @@ main:
 	jsr	cls
 
 	lea	bannertext,a0		; Write out the banner to the screen
-	jsr	prt_str			; It's already been sent over the serial connection
+	jsr	prt_str
 
 	lea	memtstcomptext,a0	; Write out the memory test completed
-	jsr	prt_str			; message to both serial and screen
+	jsr	prt_str
+
+	jsr	quick_test_clock
 
 	jsr	init_ipc_test		; Run the initial IPC tests.
 
 	bra	end
+
+end:	bra end
+
 
 .align
 
@@ -876,13 +957,21 @@ font_char127:	dc.b	$38,$44,$5c,$64,$5c,$44,$38,$0,$0,$0
 
 escbrack:	dc.b	$1b,"[",$0
 clrandhome:	dc.b	$1b,"[2J",$1b,"[H",$0
+crlftxt:	dc.b	$0d,$0a,$0
 
 bannertext:
-	dc.b	"QL Diagnostics version 0.00",$0d,$0a,$0
+	dc.b	"QL Bare Metal Diagnostic ROM version 0.00",$0d,$0a,$0
+memtststarttxt:
+	dc.b	"Starting initial 128K memory test.",$0d,$0a,$0
 memerrtext:
 	dc.b	"Memory test error, halting.",$0d,$0a,$0
 memtstcomptext:
 	dc.b	"Initial memory test complete.",$0d,$0a,$0
+init_ipc_start_txt:
+	dc.b	"Starting initial IPC tests.",$0d,$0a,$0
+
+qtclocktxt:
+	dc.b	"Testing clock.",$0d,$0a,$0
 
 donetxt:
 	dc.b	"done.",$0d,$0a,$0
