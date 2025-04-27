@@ -350,6 +350,57 @@ trapvec:
 ; Start of utility library functions.
 ;*****************************************************************************
 
+
+;***
+;
+; read_clock_value - Read the ZX8302 clock.
+;
+; Returns low word in d0 and high word in d1
+;
+;***
+
+read_clock_value:
+	movem.l	d2-d7/a0-a6,-(SP)
+
+	lea	zx83rclock,a0		; Load the address of the RTC base
+	move.w	(a0),d1			; Copy the high word into d1
+	move.w	2(a0),d0		; Copy the low word into d0
+
+	movem.l	(SP)+,d2-d7/a0-a6
+	rts
+
+;***
+;
+; sleep - wait for a number of seconds.
+;
+; d0.w - Number of seconds to wait.
+;
+;***
+
+sleep:
+	movem.l	d0-d7/a0-a6,-(SP)
+
+	move.w	d0,d3			; Counter for the number of seconds to wait.
+
+	jsr	read_clock_value	; Read the clock values into d0 and d1
+
+	move.w	d0,d2			; Copy the low word of the time to d2
+
+sleep_loop1:
+	jsr	read_clock_value	; Read the clock
+	cmp.w	d0,d2			; Has it changed?
+	beq	sleep_loop1		; No? Then read it again!
+	subi.b	#1,d3			; Decrement our counter for the number times around the loop
+	tst.b	d3			; Have we reached the end?
+	beq	sleep_end		; If yes then finish
+	move.w	d0,d2			; Update the "previous value" of the time
+	bra	sleep_loop1		; Go around again
+	
+sleep_end:
+
+	movem.l	(SP)+,d0-d7/a0-a6
+	rts
+
 ;***
 ;
 ; prt_str - Send a string to both the serial port and the screen at the current
@@ -716,24 +767,6 @@ init_ipc_test:
 	jsr	prt_str
 
 	movem.l	(SP)+,d0-d7/a0-a6
-	rts
-
-;***
-;
-; read_clock_value - Read the ZX8302 clock.
-;
-; Returns low word in d0 and high word in d1
-;
-;***
-
-read_clock_value:
-	movem.l	d2-d7/a0-a6,-(SP)
-
-	lea	zx83rclock,a0		; Load the address of the RTC base
-	move.w	(a0),d1			; Copy the high word into d1
-	move.w	2(a0),d0		; Copy the low word into d0
-
-	movem.l	(SP)+,d2-d7/a0-a6
 	rts
 
 ;***
