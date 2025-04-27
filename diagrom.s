@@ -102,46 +102,19 @@ start:
 	move.b	#0,$63(a0)	; Change to MODE 4
 	move.b	#$0F,$21(a0)	; Clear and disable interrupts
 	move.b	#$05,$2(a0)	; Set the ouput serial port settings (ser1, 4800 baud)
-	lea	bannertext,a1	; Put the address of the text banner into a1
-printban:
-	cmpi.b	#0,(a1)		; Is it a NULL byte?
-	beq	banend		; If so finish
-	move.b	(a1)+,d0	; Copy character into d0 and increment a1
-	move.b	d0,$22(a0)	; Transmit the character.
-banprtwait:
-	btst.b	#2,$20(a0)	; See if the transmit buffer is full
-	bne	banprtwait	; If it is go around again until it's empty
-	bra	printban	; Print the next character
+	lea	bannertext,a5	; Put the address of the text banner into a1
+	lea	banend,a6	; Put the pointer to the return address into a6
+	bra	noram_print_string
 banend:
 	bra	memtest
 endmemtst:
 
 	lea	startsp,sp
 
-	move.b	#0,d0		; Set the cursor to the top left of the display
-	move.b	#0,d1
-
-	jsr	scr_cur_pos
-	jsr	ser_cur_pos
-
-	lea	bannertext,a0	; Write out the banner to the screen
-	jsr	scr_prt_str	; It's already been sent over the serial connection
-
-	lea	memtstcomptext,a0	; Write out the memory test completed
-	jsr	scr_prt_str		; message to both serial and screen
-	jsr	ser_prt_str
-
-;	lea	ramstart,a1
-;loopy:
-;	move.l	#255,d0
-;loopy2:
-;	move.b	d0,(a1)
-;	dbf	d0,loopy2
-
-	bra	end
+	bra	main
 
 ;
-; noram_ser_print_string
+; noram_print_string
 ;
 ; Print a NULL terminated string to the serial port without RAM
 ;
@@ -149,29 +122,70 @@ endmemtst:
 ; a5 - address of the start of the string
 ; a6 - return address
 ;
-; d6 and a5 corrupted
+; d0, d2, , d3, d4, d5, d6, a1, a4 and a5 corrupted
 ;
 
-noram_ser_print_string:
-noram_ser_print_string_loop1:
-	cmpi.b	#0,(a5)		; Is it a NULL byte?
-	beq	noram_ser_print_string_end		; If so finish
-	move.b	(a5)+,d6	; Copy character into d0 and increment a1
+noram_print_string:
+	lea	ramstart,a4
+
+	move.l	#0,d0		; Set up the starting position to print onto screen
+	move.l	d0,d5
+
+
+nr_p_string_loop1:
+	move.l	#0,d6		; clear out d6
+	move.b	(a5)+,d6	; Copy character into d6 and increment a5
+
+	tst.b	d6		; Is it a NULL byte?
+	beq	nr_p_string_end		; If so finish
+
 	move.b	d6,$22(a0)	; Transmit the character.
-noram_ser_print_string_wait:
+
+nr_p_string_wait:
 	btst.b	#2,$20(a0)	; See if the transmit buffer is full
-	bne	noram_ser_print_string_wait	; If it is go around again until it's empty
-	bra	noram_ser_print_string_loop1	; Print the next character
-noram_ser_print_string_end:
+	bne	nr_p_string_wait	; If it is go around again until it's empty
+
+; Try to write to the screen
+
+	mulu	#2,d0		; The X offset is two bytes so double d0
+
+	sub.l	#31,d6		; Subtract 31 as the font table doesn't have non-printable characters.
+	mulu	#10,d6		; Set the offset of the character in the font table (each entry is 10 bytes long)
+
+	lea	font_char0,a1	; Load the start address of the font table into a1.
+	add.l	d6,a1		; Point to the start of the character.
+
+	move.l	#8,d3		; Set up the loop counter
+
+nr_prt_chr_loop:
+	move.b	#8,d4			; Set the d4 to be the offset to
+	sub.b	d3,d4			; the current scanline of the character.
+	move.b	(0,a1,d4),(0,a4,d0)	; Write the font byte to the screen.
+	move.b	(0,a1,d4),(1,a4,d0)	; Write the font byte to the screen.
+	add.l	#128,d0			; Increment the pointer to the next scanline.
+	dbf	d3,nr_prt_chr_loop     ; Go around again if we haven't done all the lines.
+
+	add.b	#1,d5			; Move the cursor to the right
+	move.l	d5,d0
+
+	bra	nr_p_string_loop1	; Print the next character
+
+nr_p_string_end:
+	mulu	#2,d0
+	move.l	#8,d3
+nrpdendlp:
+	move.b	#$FF,(0,a4,d0)
+	add.l	#128,d0
+	dbf	d3,nrpdendlp
+
 	jmp	(a6)
 	
 memtest:
 	move.l	#1,d2		; Memory test 1
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 	move.l	#0,d3
@@ -181,10 +195,9 @@ ownaddrwr:
 	dbf	d0,ownaddrwr	; Go around until the end of memory
 	dbf	d1,ownaddrwr
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 	move.l	#0,d3
@@ -196,10 +209,9 @@ ownaddrrd:
 	dbf	d0,ownaddrrd	; Go around until end of memory
 	dbf	d1,ownaddrrd
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 marchtestp1:
@@ -209,10 +221,9 @@ marchtestp1:
 
 	move.l	#2,d2		; Memory test 2
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 	move.l	#$000000FF,d3
@@ -225,10 +236,9 @@ marchtestp2:
 
 	move.l	#3,d2		; Memory test 3
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 	move.l	#$00000000,d3
@@ -241,10 +251,9 @@ marchtestp3:
 
 	move.l	#4,d2		; Memory test 4
 
-	move.l	#basramsiz,d0	; Put the base RAM size into d0
-	move.l	d0,d1
-	lsr.l	#8,d1
-	lsr.l	#8,d1		; Put the high word of the count into d1
+	move.l	#$7fff,d0	; Set up the RAM test loop counters
+	move.l	#3,d1
+
 	lea	ramstart,a1	; Load the base of RAM into a1
 
 	move.l	#$000000FF,d3
@@ -259,12 +268,10 @@ memtstend:
 
 	bra	endmemtst	; The memory test has completed successfully.
 
-memerrorprtret1redir:	dc.l	memerrorprtret1
-
 memerror:
 	lea	memerrtext,a5	; Put the address of the memory error text into a5
-	lea	memerrorprtret1redir,a6
-	bra	noram_ser_print_string
+	lea	memerrorprtret1,a6
+	bra	noram_print_string
 memerrorprtret1:
 	move.l	a1,d4
 	move.b	(a1),d0
@@ -298,161 +305,6 @@ eloopy2:
 
 end:	bra end
 
-;
-; Print a string to the serial port.
-;
-; a0 - pointer to the NULL terminated string.
-;
-
-ser_prt_str:
-	movem.l	d0/a1,-(SP)
-	lea	zx83base,a1		; Load the I/O base address into A1
-ser_prt_str_loop1:
-	cmpi.b	#0,(a0)			; Is it a NULL byte?
-	beq	ser_prt_str_end		; If so finish
-	move.b	(a0)+,d0		; Copy character into d0 and increment a1
-	move.b	d0,$22(a1)		; Transmit the character.
-ser_prt_str_wait:
-	btst.b	#2,$20(a1)		; See if the transmit buffer is full
-	bne	ser_prt_str_wait	; If it is go around again until it's empty
-	bra	ser_prt_str_loop1	; Print the next character
-ser_prt_str_end:
-	movem.l (SP)+,d0/a1
-	rts
-
-;
-; Send the ANSI codes for cursor position to the serial port.
-;
-; Cursor position is in the system variables.
-;
-
-ser_cur_pos:
-	rts
-
-;
-; Print a string to the screen from the current cursor position.
-;
-; A0 - pointer to the NULL terminated string.
-;
-
-scr_prt_str:
-	movem.l	d0-d1,-(SP)
-	move.l	#0,d1			; Set the offset pointer to zero
-scr_prt_str_loop1:
-	move.b	(0,a0,d1),d0		; Copy the character from memory into d0
-	tst.b	d0
-	beq	scr_prt_str_end		; If the character is a NULL skip to the end
-	add.l	#1,d1			; Increment the offset pointer
-	jsr	scr_prt_chr		; Print the character
-	bra	scr_prt_str_loop1	; Go around again for the next byte
-scr_prt_str_end:
-	movem.l	(SP)+,d0-d1
-	rts
-
-;
-; Print a character on the screen at the current cursor position and move the cursor on one position
-;
-; d0 - ASCII character to be printed
-;
-
-scr_prt_chr:
-	movem.l d0-d6/a0-a2,-(SP)
-
-	lea	ramstart,a0	; Set the screen start pointer
-
-	lea	sysvarbase,a1	; Obtain the current cursor position
-	add.l	sysv_cur_x,a1	; and save a copy in d5 and d6
-	move.l	a1,a2		; d1 and d2 are working registers
-
-	move.l	#0,d1
-	move.l	#0,d2
-	move.l	#0,d5
-	move.l	#0,d6
-
-	move.b	(a1)+,d1
-	move.b	(a1),d2
-
-	move.b	d1,d5
-	move.b	d2,d6
-
-	andi.l	#$0000007F,d0	; Make sure that the data we're given holds just the character
-	cmpi.b	#31,d0		; Is the character non-printable?
-	blt	scr_prt_chr_special ; Jump to the special character decode routine if so.
-
-	sub.l	#31,d0		; Subtract 31 as the font table doesn't have non-printable characters.
-	mulu	#10,d0		; Set the offset of the character in the font table
-
-	mulu	#2,d1		; The X offset is two bytes
-	mulu	#1280,d2		; Each scan line is 128 bytes, so each character line is 1280 bytes
-	add.l	d1,d2		; d2 should hold the offset address of the top byte of the character.
-
-	lea	font_char0,a1	; Load the start address of the font table into a1.
-	add.l	d0,a1		; Point to the start of the character.
-
-	move.l	#8,d3		; Set up the loop counter
-
-scr_prt_chr_loop:
-	move.b	#8,d4			; Set the d4 to be the offset to
-	sub.b	d3,d4			; the current scanline of the character.
-	move.b	(0,a1,d4),(0,a0,d2)	; Write the font byte to the screen.
-	move.b	(0,a1,d4),(1,a0,d2)	; Write the font byte to the screen.
-	add.l	#128,d2			; Increment the pointer to the next scanline.
-	dbf	d3,scr_prt_chr_loop     ; Go around again if we haven't done all the lines.
-
-	add.b	#1,d5			; Move the cursor to the right
-	move.l	d1,d3			; Check that we've not gone off the right of the screen.
-	sub.l	#81,d3
-	bne	scr_prt_chr_inc_jmp
-	add.b	#1,d6			; If we have move the cursor down
-	move.b	#0,d5			; and back to the left. (Wrap)
-
-scr_prt_chr_inc_jmp:
-	cmpi.l	#24,d6			; Are we below the bottom of the screen?
-	blt	scr_prt_chr_nowrap
-	move.l	#0,d6			; If so wrap to the top.
-scr_prt_chr_nowrap:
-
-scr_prt_chr_end:
-	move.b	d5,d0			; Set the real cursor position variables
-	move.b	d6,d1			; to match our shadow copies.
-	jsr	scr_cur_pos
-
-	movem.l	(SP)+,d0-d6/a0-a2
-	rts
-
-;
-; Deal with control characters.
-; We only worry about carrage return and line feed.
-;
-
-scr_prt_chr_special:
-	cmpi.b	#$0d,d0			; Is it carrage return?
-	bne	scr_prt_chr_ncr
-	move.b	#0,d5			; If yes move the cursor to the left side
-scr_prt_chr_ncr:
-	cmpi.b	#$0a,d0			; Is it line feed?
-	bne	scr_prt_chr_nlf
-	add.b	#1,d6			; Move the cursor down.
-scr_prt_chr_nlf:
-	bra	scr_prt_chr_inc_jmp	; Jump back to the main routine
-
-;
-; Set the screen cursor position
-;
-; d0 - X position in character cells.
-; d1 - Y position in character cells.
-;
-
-scr_cur_pos:
-	movem.l	a0,-(SP)		; Save the registers we're going to modify
-	lea	sysvarbase,a0		; Load the base system variable address into a0
-	add.l	sysv_cur_x,a0		; Add the offset to the cursor location
-	move.b	d0,(a0)+		; Write the values to the system variables.
-	move.b	d1,(a0)
-	movem.l	(SP)+,a0		; Restore the registers.
-
-	rts
-
 buserr:
 addresserr:
 illegalins:
@@ -482,7 +334,7 @@ memerrtext:
 memtstcomptext:
 	dc.b	"Initial memory test complete.",$0d,$0a,$0
 
-align
+.align
 
 ;
 ; This font has ben extracted from the Eurofont file
@@ -619,3 +471,231 @@ font_char125:	dc.b	$38,$44,$5c,$64,$5c,$44,$38,$0,$0,$0
 font_char126:	dc.b	$38,$44,$5c,$64,$5c,$44,$38,$0,$0,$0
 font_char127:	dc.b	$38,$44,$5c,$64,$5c,$44,$38,$0,$0,$0
 
+;*****************************************************************************
+; Start of utility library functions.
+;*****************************************************************************
+
+;***
+;
+; prt_str - Send a string to both the serial port and the screen at the current
+;	cursor position
+;
+;***
+
+prt_str:
+	jsr	ser_prt_str
+	jsr	scr_prt_str
+	rts
+
+;***
+;
+; Print a string to the serial port.
+;
+; a0 - pointer to the NULL terminated string.
+;
+;***
+
+ser_prt_str:
+	movem.l	d0/a0-a1,-(SP)
+	lea	zx83base,a1		; Load the I/O base address into A1
+ser_prt_str_loop1:
+	cmpi.b	#0,(a0)			; Is it a NULL byte?
+	beq	ser_prt_str_end		; If so finish
+	move.b	(a0)+,d0		; Copy character into d0 and increment a1
+	move.b	d0,$22(a1)		; Transmit the character.
+ser_prt_str_wait:
+	btst.b	#2,$20(a1)		; See if the transmit buffer is full
+	bne	ser_prt_str_wait	; If it is go around again until it's empty
+	bra	ser_prt_str_loop1	; Print the next character
+ser_prt_str_end:
+	movem.l (SP)+,d0/a0-a1
+	rts
+
+;***
+;
+; Print a string to the screen from the current cursor position.
+;
+; A0 - pointer to the NULL terminated string.
+;
+;***
+
+scr_prt_str:
+	movem.l	d0-d1,-(SP)
+	move.l	#0,d1			; Set the offset pointer to zero
+scr_prt_str_loop1:
+	move.b	(0,a0,d1),d0		; Copy the character from memory into d0
+	tst.b	d0
+	beq	scr_prt_str_end		; If the character is a NULL skip to the end
+	add.l	#1,d1			; Increment the offset pointer
+	jsr	scr_prt_chr		; Print the character
+	bra	scr_prt_str_loop1	; Go around again for the next byte
+scr_prt_str_end:
+	movem.l	(SP)+,d0-d1
+	rts
+
+;***
+;
+; Print a character on the screen at the current cursor position and move the cursor on one position
+;
+; d0 - ASCII character to be printed
+;
+;***
+
+scr_prt_chr:
+	movem.l d0-d6/a0-a2,-(SP)
+
+	lea	ramstart,a0	; Set the screen start pointer
+
+	lea	sysvarbase,a1	; Obtain the current cursor position
+	add.l	sysv_cur_x,a1	; and save a copy in d5 and d6
+	move.l	a1,a2		; d1 and d2 are working registers
+
+	move.l	#0,d1		; Clear out d1, d2, d5 and d6
+	move.l	#0,d2
+	move.l	#0,d5
+	move.l	#0,d6
+
+	move.b	(a1)+,d1	; Load d1 with X character postion
+	move.b	(a1),d2		; Load d2 with Y character position
+
+	move.b	d1,d5		; Copy the X and Y positions into d5 and d6
+	move.b	d2,d6
+
+	andi.l	#$0000007F,d0	; Make sure that the data we're given holds just the character
+	cmpi.b	#31,d0		; Is the character non-printable?
+	blt	scr_prt_chr_special ; Jump to the special character decode routine if so.
+
+	sub.l	#31,d0		; Subtract 31 as the font table doesn't have non-printable characters.
+	mulu	#10,d0		; Set the offset of the character in the font table
+
+	mulu	#2,d1		; The X offset is two bytes
+	mulu	#1280,d2		; Each scan line is 128 bytes, so each character line is 1280 bytes
+	add.l	d1,d2		; d2 should hold the offset address of the top byte of the character.
+
+	lea	font_char0,a1	; Load the start address of the font table into a1.
+	add.l	d0,a1		; Point to the start of the character.
+
+	move.l	#8,d3		; Set up the loop counter
+
+scr_prt_chr_loop:
+	move.b	#8,d4			; Set the d4 to be the offset to
+	sub.b	d3,d4			; the current scanline of the character.
+	move.b	(0,a1,d4),(0,a0,d2)	; Write the font byte to the screen.
+	move.b	(0,a1,d4),(1,a0,d2)	; Write the font byte to the screen.
+	add.l	#128,d2			; Increment the pointer to the next scanline.
+	dbf	d3,scr_prt_chr_loop     ; Go around again if we haven't done all the lines.
+
+	add.b	#1,d5			; Move the cursor to the right
+	move.l	d1,d3			; Check that we've not gone off the right of the screen.
+	sub.l	#81,d3
+	bne	scr_prt_chr_inc_jmp
+	add.b	#1,d6			; If we have move the cursor down
+	move.b	#0,d5			; and back to the left. (Wrap)
+
+scr_prt_chr_inc_jmp:
+	cmpi.l	#24,d6			; Are we below the bottom of the screen?
+	blt	scr_prt_chr_nowrap
+	move.l	#0,d6			; If so wrap to the top.
+scr_prt_chr_nowrap:
+
+scr_prt_chr_end:
+	move.b	d5,d0			; Set the real cursor position variables
+	move.b	d6,d1			; to match our shadow copies.
+	jsr	scr_cur_pos
+
+	movem.l	(SP)+,d0-d6/a0-a2
+	rts
+
+;
+; 	Deal with control characters.
+; 	We only worry about carrage return and line feed.
+;
+
+scr_prt_chr_special:
+	cmpi.b	#$0d,d0			; Is it carrage return?
+	bne	scr_prt_chr_ncr
+	move.b	#0,d5			; If yes move the cursor to the left side
+scr_prt_chr_ncr:
+	cmpi.b	#$0a,d0			; Is it line feed?
+	bne	scr_prt_chr_nlf
+	add.b	#1,d6			; Move the cursor down.
+scr_prt_chr_nlf:
+	bra	scr_prt_chr_inc_jmp	; Jump back to the main routine
+
+cur_pos:
+	jsr	ser_cur_pos
+	jsr	scr_cur_pos
+	rts
+
+;***
+;
+; Send the ANSI codes for cursor position to the serial port.
+;
+; d0 - X position in character cells.
+; d1 - Y position in character cells.
+;
+;***
+
+ser_cur_pos:
+	rts
+
+;***
+;
+; Set the screen cursor position
+;
+; d0 - X position in character cells.
+; d1 - Y position in character cells.
+;
+;***
+
+scr_cur_pos:
+	movem.l	a0,-(SP)		; Save the registers we're going to modify
+	lea	sysvarbase,a0		; Load the base system variable address into a0
+	add.l	sysv_cur_x,a0		; Add the offset to the cursor location
+	move.b	d0,(a0)+		; Write the values to the system variables.
+	move.b	d1,(a0)
+	movem.l	(SP)+,a0		; Restore the registers.
+
+	rts
+
+;*****************************************************************************
+; End of utility library functions.
+;*****************************************************************************
+
+;*****************************************************************************
+;
+; Start of diagnostic routines.
+;
+;*****************************************************************************
+
+;*****************************************************************************
+;
+; End of diagnostic routines.
+;
+;*****************************************************************************
+
+
+;
+; The main program starts here as we have a stack and can program normally.
+;
+
+main:
+	move.b	#0,d0		; Set the cursor to the top left of the display
+	move.b	#0,d1
+
+	jsr	cur_pos
+
+	lea	bannertext,a0	; Write out the banner to the screen
+	jsr	scr_prt_str	; It's already been sent over the serial connection
+
+	lea	memtstcomptext,a0	; Write out the memory test completed
+	jsr	prt_str		; message to both serial and screen
+
+;	lea	ramstart,a1
+;loopy:
+;	move.l	#255,d0
+;loopy2:
+;	move.b	d0,(a1)
+;	dbf	d0,loopy2
+
+	bra	end
