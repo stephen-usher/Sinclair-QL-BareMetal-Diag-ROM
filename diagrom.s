@@ -54,17 +54,33 @@ startsp		equ	$0003FFF0
 
 zx83base	equ	$00018000
 
-zx83rclock	equ	zx83base
-zx83rcstatus	equ	zx83base+$20
-zx83ristatus	equ	zx83base+$21
-zx83rmdvtrk1	equ	zx83base+$22
-zx83rmdvtrk2	equ	zx83base+$23
+zx83off_r_clock		equ	$00
+zx83off_r_cstatus	equ	$20
+zx83off_r_istatus	equ	$21
+zx83off_r_mdvtrk1	equ	$22
+zx83off_r_mdvtrk2	equ	$23
 
-zx83wtransreg	equ	zx83base+$2
-zx83wipcwr	equ	zx83base+$3
-zx83wmdvreg	equ	zx83base+$20
-zx83wimaskreg	equ	zx83base+$21
-zx83wtrasdata	equ	zx83base+$22
+zx83off_w_clock		equ	$0
+zx83off_w_transreg	equ	$2
+zx83off_w_ipcwreg	equ	$3
+zx83off_w_mdvreg		equ	$20
+zx83off_w_imaskreg	equ	$21
+zx83off_w_transdata	equ	$22
+
+zx83off_vidreg	equ	$63
+
+zx83_r_clock		equ	zx83base
+zx83_r_cstatus		equ	zx83base+zx83off_r_cstatus
+zx83_r_istatus		equ	zx83base+zx83off_r_istatus
+zx83_r_mdvtrk1		equ	zx83base+zx83off_r_mdvtrk1
+zx83_r_mdvtrk2		equ	zx83base+zx83off_r_mdvtrk2
+
+zx83_w_clock		equ	zx83base+zx83off_w_clock
+zx83_w_transreg		equ	zx83base+zx83off_w_transreg
+zx83_w_ipcwreg		equ	zx83base+zx83off_w_ipcwreg
+zx83_w_mdvreg		equ	zx83base+zx83off_w_mdvreg
+zx83_w_imaskreg		equ	zx83base+zx83off_w_imaskreg
+zx83_w_transdata	equ	zx83base+zx83off_w_transdata
 
 ramstart	equ	$00020000
 basramsiz	equ	$0001FFFF
@@ -74,7 +90,7 @@ sysvarbase	equ	$00028000
 sysv_cur_x	equ	$0
 sysv_cur_y	equ	$1
 
-ser_workspace	equ	$000028200
+workspace	equ	$000028200
 
 	dc.l	startsp
 	dc.l	start
@@ -114,9 +130,11 @@ ser_workspace	equ	$000028200
 
 start:
 	lea	zx83base,a0
-	move.b	#0,$63(a0)	; Change to MODE 4
-	move.b	#$0F,$21(a0)	; Clear and disable interrupts
-	move.b	#$05,$2(a0)	; Set the ouput serial port settings (ser1, 4800 baud)
+	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
+	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+	move.b	#$05,zx83off_w_transreg(a0)	; Set the ouput serial port settings (ser1, 4800 baud)
+	move.b	#$01,zx83off_w_ipcwreg(a0)	; Reset the IPC
+	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
 	lea	bannertext,a5	; Put the address of the text banner into a1
 	lea	banend,a6	; Put the pointer to the return address into a6
 	bra	noram_print_string
@@ -158,10 +176,10 @@ nr_p_string_loop1:
 	tst.b	d6		; Is it a NULL byte?
 	beq	nr_p_string_end		; If so finish
 
-	move.b	d6,$22(a0)	; Transmit the character.
+	move.b	d6,zx83off_w_transdata(a0)	; Transmit the character.
 
 nr_p_string_wait:
-	btst.b	#2,$20(a0)	; See if the transmit buffer is full
+	btst.b	#2,zx83off_r_cstatus(a0)	; See if the transmit buffer is full
 	bne	nr_p_string_wait	; If it is go around again until it's empty
 
 ; Try to write to the screen
@@ -362,7 +380,7 @@ trapvec:
 read_clock_value:
 	movem.l	d2-d7/a0-a6,-(SP)
 
-	lea	zx83rclock,a0		; Load the address of the RTC base
+	lea	zx83_r_clock,a0		; Load the address of the RTC base
 	move.w	(a0),d1			; Copy the high word into d1
 	move.w	2(a0),d0		; Copy the low word into d0
 
@@ -445,8 +463,8 @@ ser_prt_str_end:
 ser_prt_chr:
 	movem.l	a1,-(SP)
 
-	lea	zx83base,a1		; Load the I/O base address into A1
-	move.b	d0,$22(a1)		; Transmit the character.
+	lea	zx83_w_transdata,a1	; Load the transmit register address into A1
+	move.b	d0,(a1)			; Transmit the character.
 ser_prt_chr_wait:
 	btst.b	#2,$20(a1)		; See if the transmit buffer is full
 	bne	ser_prt_chr_wait	; If it is go around again until it's empty
@@ -605,7 +623,7 @@ ser_cur_pos:
 
 	jsr	itoa
 
-	lea	ser_workspace,a0
+	lea	workspace,a0
 
 	jsr	ser_prt_str
 
@@ -786,7 +804,7 @@ quick_test_clock:
 	move.w	d0,d2			; Copy the low word of the time to d2
 	moveq	#5,d3			; Counter for the number of seconds to wait.
 
-	lea	ser_workspace,a0	; Generate the ASCII representation
+	lea	workspace,a0	; Generate the ASCII representation
 	jsr	itoa
 
 	jsr	prt_str			; Print it
@@ -802,7 +820,7 @@ quick_test_clock_loop1:
 	tst.b	d3			; Have we reached the end?
 	beq	qtcl1_end		; If yes then finish
 	move.w	d0,d2			; Update the "previous value" of the time
-	lea	ser_workspace,a0	; Generate the ASCII reprisentation
+	lea	workspace,a0	; Generate the ASCII reprisentation
 	jsr	itoa
 	jsr	prt_str			; Print it
 	lea	crlftxt,a0		; Print carriage-return linefeed
