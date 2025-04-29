@@ -1,8 +1,9 @@
 VASM=vasmm68k_mot
 VASMOPT=-Fbin -m68008 -no-opt
 ROM_TEST_DEST=~/Emulators/QL/sQLux-1.0.7b/roms
+SOURCE=diagrom.s library.s tests.s strings.inc font.inc
 
-diagrom.bin:	diagrom.s
+diagrom.bin:	$(SOURCE)
 	$(VASM) $(VASMOPT)  -o diagrom.bin diagrom.s
 
 clean:
