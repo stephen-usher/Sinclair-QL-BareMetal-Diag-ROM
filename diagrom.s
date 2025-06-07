@@ -84,11 +84,15 @@ zx83_w_transdata	equ	zx83base+zx83off_w_transdata
 
 ramstart	equ	$00020000
 basramsiz	equ	$0001FFFF
+extramstart	equ	$00040000
 
 sysvarbase	equ	$00028000
 
 sysv_cur_x	equ	$0
 sysv_cur_y	equ	$1
+sysv_cur_twd	equ	$2
+sysv_ramtop	equ	$4
+sysv_ramsiz	equ	$8
 
 workspace	equ	$000028200
 
@@ -382,6 +386,10 @@ main:
 
 	lea	memtstcomptext,a0	; Write out the memory test completed
 	jsr	prt_str
+
+	jsr	size_memory		; Find out how much RAM we have.
+
+	jsr	ext_mem_test		; Test the expanded RAM.
 
 	jsr	quick_test_clock
 

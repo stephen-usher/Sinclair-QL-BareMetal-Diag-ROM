@@ -27,6 +27,37 @@ init_ipc_selftest_txt:
 qtclocktxt:
 	dc.b	"Testing clock.",$0d,$0a,$0
 
+sizememtxt:
+	dc.b	"Finding extended memory: ",$0
+sizememtoptxt:
+	dc.b	$0d,$0a,"Top of memory is: ",$0
+sizememsizetxt:
+	dc.b	$0d,$0a,"Memory size: ",$0
+
+extmemtstbantxt:
+	dc.b	"Running expanded memory tests:",$d,$a,$0
+
+extmemtstowntxt1:
+	dc.b	"     Own address test: write: ",$0
+extmemtstowntxt2:
+	dc.b	"     Own address test: read: ",$0
+
+extmemtstmarchtxt1:
+	dc.b	"     March test: write: ",$0
+extmemtstmarchtxt2:
+	dc.b	"     March test: invert 1: ",$0
+extmemtstmarchtxt3:
+	dc.b	"     March test: invert 2: ",$0
+extmemtstmarchtxt4:
+	dc.b	"     March test: invert 3: ",$0
+
+extmemtsterr1:
+	dc.b	$0d,$0a,"Memory error: Address: ",$0
+extmemtsterr2:
+	dc.b	" should be: ",$0
+extmemtsterr3:
+	dc.b	" was: ",$0
+
 donetxt:
 	dc.b	"done.",$0d,$0a,$0
 completedtxt:

@@ -394,9 +394,10 @@ ser_prt_chr_wait:
 ;***
 
 scr_prt_str:
-	movem.l	d0-d1,-(SP)
+	movem.l	d0-d6/a0-a6,-(SP)
 
 	move.l	#0,d1			; Set the offset pointer to zero
+	move.l	d1,d0			; Clear out d0 as well
 scr_prt_str_loop1:
 	move.b	(0,a0,d1),d0		; Copy the character from memory into d0
 	tst.b	d0
@@ -408,7 +409,7 @@ scr_prt_str_loop1:
 	bra	scr_prt_str_loop1	; Go around again for the next byte
 
 scr_prt_str_end:
-	movem.l	(SP)+,d0-d1
+	movem.l	(SP)+,d0-d6/a0-a6
 	rts
 
 ;***
@@ -420,17 +421,20 @@ scr_prt_str_end:
 ;***
 
 scr_prt_chr:
-	movem.l d0-d6/a0-a2,-(SP)
+	movem.l d0-d6/a0-a6,-(SP)
 
 	lea	ramstart,a0	; Set the screen start pointer
 
 	lea	sysvarbase,a1	; Obtain the current cursor position
 	move.l	a1,a2		; d1 and d2 are working registers
 
-	move.l	#0,d1		; Clear out d1, d2, d5 and d6
+	move.l	#0,d1		; Clear out d1, d2, d4, d5 and d6
 	move.l	#0,d2
+	move.l	#0,d4
 	move.l	#0,d5
 	move.l	#0,d6
+
+	and.l	#$000000ff,d0	; Make sure that we only have the character in d0
 
 	move.b	sysv_cur_x(a1),d1	; Load d1 with X character postion
 	move.b	sysv_cur_y(a1),d2		; Load d2 with Y character position
@@ -463,8 +467,7 @@ scr_prt_chr_loop:
 	dbf	d3,scr_prt_chr_loop     ; Go around again if we haven't done all the lines.
 
 	add.b	#1,d5			; Move the cursor to the right
-	move.l	d1,d3			; Check that we've not gone off the right of the screen (64 characters wide).
-	sub.l	#63,d3
+	cmp.b	#64,d5			; Test if we've gone off the right size of the screen.
 	bne	scr_prt_chr_inc_jmp
 	add.b	#1,d6			; If we have move the cursor down
 	move.b	#0,d5			; and back to the left. (Wrap)
@@ -480,12 +483,12 @@ scr_prt_chr_end:
 	move.b	d6,d1			; to match our shadow copies.
 	jsr	scr_cur_pos
 
-	movem.l	(SP)+,d0-d6/a0-a2
+	movem.l	(SP)+,d0-d6/a0-a6
 	rts
 
 ;
 ; 	Deal with control characters.
-; 	We only worry about carrage return and line feed.
+; 	We only worry about carrage return and line feed and backspace.
 ;
 
 scr_prt_chr_special:
@@ -497,6 +500,11 @@ scr_prt_chr_ncr:
 	bne	scr_prt_chr_nlf
 	add.b	#1,d6			; Move the cursor down.
 scr_prt_chr_nlf:
+	cmpi.b	#8,d0			; Is it backspace?
+	bne	scr_prt_ret_special
+	jsr	scr_cur_bsp_int		; Run the backspace routine
+
+scr_prt_ret_special:
 	bra	scr_prt_chr_inc_jmp	; Jump back to the main routine
 
 	align 2
@@ -694,6 +702,59 @@ scr_cur_bol:
 
 ;***
 ;
+; scr_cur_bsp - Backspace the cursor.
+;
+;***
+
+scr_cur_bsp:
+	movem.l	a0-a6/d0-d6,-(SP)
+
+	jsr	get_cur_pos		; X position is in d0 and Y in d1
+
+	move.b	d0,d5
+	move.b	d1,d6
+
+	jsr	scr_cur_bsp_int
+
+	move.b	d5,d0
+	move.b	d6,d1
+
+	jsr	scr_cur_pos		; Set the cursor position in the system variables
+
+	movem.l	(SP)+,a0-a6/d0-d6
+	rts
+
+;***
+;
+; scr_cur_bsp_int - Backspace the cursor.
+;
+;***
+
+scr_cur_bsp_int:
+	movem.l	a0-a6/d0-d1,-(SP)
+
+	cmp.b	#0,d5			; Is the cursor at the beginning of a line?
+	bne	scr_cur_bsp_skip1	; No? Then we don't have to do special stuff.
+
+	moveq	#64,d5			; Move cursor one character beyond the end of the line (corrected later)
+
+	cmp.b	#0,d6			; Is the cursor at the top of the screen?
+
+	bne	scr_cur_bsp_skip2	; No, so we don't have to worry about wrapping.
+	moveq	#24,d6
+
+scr_cur_bsp_skip2:
+	sub.b	#1,d6			; Move the cursor up one line
+
+scr_cur_bsp_skip1:
+	sub.b	#1,d5			; Move the cursor back one position
+
+
+	movem.l	(SP)+,a0-a6/d0-d1
+	rts
+
+;***
+;
 ; itoa - Convert a word length unsigned integer to a decimal ASCII string.
 ;
 ; a0 - Pointer to start of destination memory. It's up to the caller to
@@ -739,6 +800,252 @@ itoa_loop2:
 	move.b	#0,(0,a0,d4)	; Write the NULL terminator to the end of the string
 
 	movem.l	(SP)+,d0-d5/a0-a6
+	rts
+
+;*****************************************************************************
+; ltoh	- translate a long to a hexadecimal string.
+;
+; a0 - Pointer to start of destination memory. It's up to the caller to
+;	make it large enough.
+; d0 - The long unsigned value.
+;
+;*****************************************************************************
+
+ltohtable:	dc.b	"0123456789abcdef"
+
+ltoh:
+	movem.l	d0-d5/a0-a6,-(SP)
+
+	lea	ltohtable,a1
+
+; Byte 3
+
+	move.l	d0,d1
+
+	lsr.l	#8,d1		; Shift the next byte to the bottom.
+	lsr.l	#8,d1
+	lsr.l	#8,d1
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+; Byte 2
+
+	move.l	d0,d1
+
+	lsr.l	#8,d1		; Shift the next byte to the bottom.
+	lsr.l	#8,d1
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+; Byte 1
+
+	move.l	d0,d1
+
+	lsr.l	#8,d1		; Shift the next byte to the bottom.
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+; Byte 0
+
+	move.l	d0,d1
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	lsl.l	#8,d3		; shift it up one
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+
+	move.b	#0,(a0)		; Add a NULL byte
+
+	movem.l	(SP)+,d0-d5/a0-a6
+	rts
+
+;*****************************************************************************
+; wtoh	- translate a word to a hexadecimal string.
+;
+; a0 - Pointer to start of destination memory. It's up to the caller to
+;	make it large enough.
+; d0 - The long unsigned value.
+;
+;*****************************************************************************
+
+wtoh:
+	movem.l	d0-d5/a0-a6,-(SP)
+
+	lea	ltohtable,a1
+
+; Byte 1
+
+	move.l	d0,d1
+
+	lsr.l	#8,d1		; Shift the next byte to the bottom.
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+; Byte 0
+
+	move.l	d0,d1
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	lsl.l	#8,d3		; shift it up one
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+
+	move.b	#0,(a0)		; Add a NULL byte
+
+	movem.l	(SP)+,d0-d5/a0-a6
+	rts
+
+;*****************************************************************************
+; btoh	- translate a byte to a hexadecimal string.
+;
+; a0 - Pointer to start of destination memory. It's up to the caller to
+;	make it large enough.
+; d0 - The long unsigned value.
+;
+;*****************************************************************************
+
+btoh:
+	movem.l	d0-d5/a0-a6,-(SP)
+
+	lea	ltohtable,a1
+
+; Byte 1
+
+	move.l	d0,d1
+
+	lsr.l	#8,d1		; Shift the next byte to the bottom.
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+; Byte 0
+
+	move.l	d0,d1
+
+	and.l	#$000000ff,d1	; Mask any higher bits.
+
+	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	lsr.b	#4,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+	lsl.l	#8,d3		; shift it up one
+	move.b	d1,d2
+	and.b	#$0f,d2		; Mask off the top nibble.
+	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
+
+
+	move.b	#0,(a0)		; Add a NULL byte
+
+	movem.l	(SP)+,d0-d5/a0-a6
+	rts
+
+
+;*****************************************************************************
+;
+; twiddle_reset	- Reset the twiddler state.
+;
+;*****************************************************************************
+
+twiddle_reset:
+	movem.l	d0-d5/a0-a6,-(SP)
+
+	lea	sysvarbase,a0		; Get the base of the system varibles into a0
+	move.b	#0,sysv_cur_twd(a0)	; Set the twiddler state to zero
+
+	movem.l	(SP)+,d0-d5/a0-a6
+	rts
+
+;*****************************************************************************
+;
+; prt_twiddle	- Reset the twiddler state.
+;
+;*****************************************************************************
+
+twiddletxt:	dc.b	"|/-\"
+
+prt_twiddle:
+	movem.l	d0-d7/a0-a6,-(SP)
+
+
+	move.l	#0,d0
+	move.l	#0,d1
+
+	lea	sysvarbase,a1		; Get the base of the system varibles into a0
+	move.b	sysv_cur_twd(a1),d1	; Get the twiddler state.
+
+	lea	twiddletxt,a2		; Get the beginning of the twiddler text into a2
+
+	move.b	(0,a2,d1),d0		; Put the current twiddler character into d0
+	jsr	prt_chr			; Print it.
+
+	add.b	#1,d1			; Increment the pointer to the twiddler character
+	cmp.b	#4,d1			; Is it beyond the end?
+	blt	prt_twiddle_skip1	; No? We don't need to do anything.
+
+	moveq	#0,d1			; It was too big, so reset it.
+
+prt_twiddle_skip1:
+	move.b	d1,sysv_cur_twd(a1)	; Update the system variable.
+
+	move.l	#0,d0
+	moveq	#8,d0			; Print a backspace.
+	jsr	prt_chr
+;	jsr	scr_cur_bsp
+
+	movem.l	(SP)+,d0-d7/a0-a6
 	rts
 
 ;*****************************************************************************
