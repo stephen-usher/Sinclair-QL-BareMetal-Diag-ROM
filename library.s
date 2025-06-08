@@ -374,15 +374,20 @@ prt_chr:
 ;*
 
 ser_prt_chr:
-	movem.l	a1,-(SP)
+	movem.l	d0-d6/a0-a6,-(SP)
 
-	lea	zx83_w_transdata,a1	; Load the transmit register address into A1
-	move.b	d0,(a1)			; Transmit the character.
+	move.l	#0,d2
+
+	lea	zx83base,a1	; Load the transmit register address into A1
+	move.b	d0,zx83off_w_transdata(a1)			; Transmit the character.
 ser_prt_chr_wait:
-	btst.b	#2,$20(a1)		; See if the transmit buffer is full
-	bne	ser_prt_chr_wait	; If it is go around again until it's empty
+;	btst.b	#2,zx83off_r_cstatus(a1)		; See if the transmit buffer is full
+	move.b	zx83off_r_cstatus(a1),d2
+	andi.b	#2,d2
+	cmpi.b	#2,d2
+	beq	ser_prt_chr_wait	; If it is go around again until it's empty
 
-	movem.l	(SP)+,a1
+	movem.l	(SP)+,d0-d6/a0-a6
 	rts
 
 ;***

@@ -136,7 +136,7 @@ start:
 	lea	zx83base,a0
 	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
 	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
-	move.b	#$05,zx83off_w_transreg(a0)	; Set the ouput serial port settings (ser1, 4800 baud)
+	move.b	#%00001010,zx83off_w_transreg(a0)	; Set the ouput serial port settings (ser2, 4800 baud)
 	move.b	#$01,zx83off_w_ipcwreg(a0)	; Reset the IPC
 	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
 	lea	bannertext,a5	; Put the address of the text banner into a1
@@ -183,8 +183,11 @@ nr_p_string_loop1:
 	move.b	d6,zx83off_w_transdata(a0)	; Transmit the character.
 
 nr_p_string_wait:
-	btst.b	#2,zx83off_r_cstatus(a0)	; See if the transmit buffer is full
-	bne	nr_p_string_wait	; If it is go around again until it's empty
+;	btst.b	#2,zx83off_r_cstatus(a0)	; See if the transmit buffer is full
+	move.b	zx83off_r_cstatus(a0),d6
+	andi.b	#$02,d6
+	cmpi.b	#$02,d6
+	beq	nr_p_string_wait	; If it is go around again until it's empty
 
 ; Try to write to the screen
 

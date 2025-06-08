@@ -14,11 +14,11 @@ This ROM replaces the main system ROM using the same EPROM adapter that you woul
 
 The design is such that to boot and do something useful only needs a minimully working system. It can run the initial memory test and report back even if no RAM is in the system.
 
-All it need to work is a working CPU, a ZX8301 which can generate the clock for the CPU, address decoding and DTACK generation and a ZX8302 which still has enough functionality to write data out of serial port 1.
+All it need to work is a working CPU, a ZX8301 which can generate the clock for the CPU, address decoding and DTACK generation and a ZX8302 which still has enough functionality to write data out of serial port 2.
 
 In other words, even if the video side of the ZX8301 is dead you can still test the rest of the system using a terminal.
 
-The serial conection on Ser1 runs at 4800 baud. Almost the very first thing the code does is write out a banner message, so look for that.
+The serial conection on ser2 runs at 4800 baud. Almost the very first thing the code does is write out a banner message, so look for that.
 
 The ROM will then run a couple of thorough memory tests on the lower 128K of RAM. Firstly an 'own address' test and then a full March test. The combination of these should catch any bad bits or addressing errors.
 
