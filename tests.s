@@ -209,8 +209,8 @@ sizememskip1:
 	lea	workspace,a0
 
 	sub.l	#ramstart,d0		; Calulate the RAM size in bytes
-	add.l	#1,d0
 	move.l	d0,sysv_ramsiz(a2)	; Update the system variable
+	add.l	#1,d0
 
 	lsr.l	#8,d0			; Divide the address by 1024
 	lsr.l	#2,d0
@@ -242,7 +242,7 @@ ext_mem_test:
 	move.l	sysv_ramsiz(a1),d5	; Put the RAM size into d5
 
 	cmp.l	#$20000,d5		; Do we have any RAM expansions?
-	beq	ext_mem_tests_skip	; Skip if we don't
+	ble	ext_mem_tests_skip	; Skip if we don't
 
 	lea	extmemtstbantxt,a0
 	jsr	prt_str

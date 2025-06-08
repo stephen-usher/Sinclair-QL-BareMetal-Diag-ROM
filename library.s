@@ -955,24 +955,6 @@ btoh:
 
 	lea	ltohtable,a1
 
-; Byte 1
-
-	move.l	d0,d1
-
-	lsr.l	#8,d1		; Shift the next byte to the bottom.
-
-	and.l	#$000000ff,d1	; Mask any higher bits.
-
-	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
-	lsr.b	#4,d2
-	and.b	#$0f,d2		; Mask off the top nibble.
-	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
-	move.b	d1,d2
-	and.b	#$0f,d2		; Mask off the top nibble.
-	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3
-
-; Byte 0
-
 	move.l	d0,d1
 
 	and.l	#$000000ff,d1	; Mask any higher bits.
