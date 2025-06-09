@@ -44,6 +44,19 @@ init_ipc_test:
 	lea	completedtxt,a0
 	jsr	prt_str
 
+	lea	init_ipc_beeptest_txt,a0
+	jsr	prt_str
+
+	jsr	ipc_beep
+
+	lea	completedtxt,a0
+	jsr	prt_str
+
+	lea	init_ipc_keyreadtest_txt,a0
+	jsr	prt_str
+
+	jsr	init_ipc_readkey
+
 	movem.l	(SP)+,d1-d7/a0-a6
 	rts
 
@@ -76,34 +89,144 @@ ipc_reset:
 ;***
 
 ipc_selftest:
+	movem.l	d2-d7/a0-a6,-(SP)
+
+	move.b	#$1a,d2
+
 	move.w	#$0FFF,d1
+
 	move.b	#$0F,d0
 	jsr	ipc_write_nibble
 
-	move.b	#$01,d0
-	jsr	ipc_write_byte
-
-	move.b	#$aa,d0
+	move.b	d2,d0
 	jsr	ipc_write_byte
 
 	jsr	ipc_read_byte
 
 	andi.w	#$00FF,d0
+	move.b	d0,d3
 
-	lea	workspace,a0
-	jsr	itoa
-
+	lea	wrotehextxt,a0
 	jsr	prt_str
 
+	move.b	d2,d0
 	lea	workspace,a0
-	move.b	#$3a,(a0)+
-	move.b	#$20,(a0)+
-
-	lea	workspace,a0
+	jsr	btoh
 	jsr	prt_str
+
+	lea	readhextxt,a0
+	jsr	prt_str
+
+	move.b	d3,d0
+	lea	workspace,a0
+	jsr	btoh
+	jsr	prt_str
+
+	lea	spacecolonspacetxt,a0
+	jsr	prt_str
+
+	moveq	#0,d1
+	cmp.b	d2,d3
+	bne	ipc_selftest_end
+	addi.b	#1,d1
+
+ipc_selftest_end:
+
+	movem.l	(SP)+,d2-d7/a0-a6
+	rts
+
+;***
+;
+; ipc_beep - Run try to tell the IPC to beep
+;
+;***
+
+ipc_beep:
+	move.w	#$0FFF,d1
+
+	move.b	#$0a,d0			; Command A
+	jsr	ipc_write_nibble
+
+	move.b	#$12,d0			; Pitch 1
+	jsr	ipc_write_byte
+
+	move.b	#$34,d0			; Pitch 2
+	jsr	ipc_write_byte
+
+	move.w	#$5678,d0		; Step interval
+	jsr	ipc_write_word
+
+	move.w	#$9abc,d0		; duration
+	jsr	ipc_write_word
+
+	move.b	#2,d0			; pitch step
+	jsr	ipc_write_nibble
+
+	move.b	#4,d0			; pitch wrap
+	jsr	ipc_write_nibble
+
+	move.b	#8,d0			; pitch randomness
+	jsr	ipc_write_nibble
+
+	move.b	#1,d0			; pitch fuzziness
+	jsr	ipc_write_nibble
 
 	rts
 
+;***
+;
+; init_ipc_readkey - read the keyboard
+;
+;***
+
+init_ipc_readkey:
+	movem.l	d0-d7/a0-a6,-(SP)
+
+	move.w	#$0FFF,d1
+
+	move.b	#$8,d0
+	jsr	ipc_write_nibble
+
+	jsr	ipc_read_byte
+
+	move.b	d0,d2
+	andi.b	#$f0,d2
+	cmpi.b	#0,d2
+	beq	init_ipc_readkey_test_nopress
+
+	andi.b	#$0f,d0
+	move.b	d0,d2
+
+	jsr	ipc_read_byte
+
+	move.b	d0,d3
+
+	lea	init_ipc_keyreadyes_txt,a0
+	jsr	prt_str
+
+	lea	workspace,a0
+
+	move.b	d2,d0
+	jsr	btoh
+	jsr	prt_str
+	move.b	d3,d0
+	jsr	btoh
+	jsr	prt_str
+
+	bra	init_ipc_keyread_end
+
+init_ipc_readkey_test_nopress:
+
+	lea	init_ipc_keyreadno_txt,a0
+	jsr	prt_str
+
+init_ipc_keyread_end:
+
+	lea	crlftxt,a0
+	jsr	prt_str
+	
+	movem.l	(SP)+,d0-d7/a0-a6
+	rts
 ;***
 ;
 ; quick_test_clock - Quickly test the clock is running.

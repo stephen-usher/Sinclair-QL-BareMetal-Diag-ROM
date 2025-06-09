@@ -22,7 +22,15 @@ init_ipc_start_txt:
 init_ipc_reset_txt:
 	dc.b	"IPC reset: ",$0
 init_ipc_selftest_txt:
-	dc.b	"IPC selftest: ",$0
+	dc.b	"IPC selftest:",$0
+init_ipc_beeptest_txt:
+	dc.b	"IPC beep test: ",$0
+init_ipc_keyreadtest_txt:
+	dc.b	"IPC read keyboard test: ",$0
+init_ipc_keyreadyes_txt:
+	dc.b	"Key was pressed: 0x",$0
+init_ipc_keyreadno_txt:
+	dc.b	"Key wasn't pressed: ",$0
 
 qtclocktxt:
 	dc.b	"Testing clock.",$0d,$0a,$0
@@ -66,3 +74,13 @@ testingtxt:
 	dc.b	"Testing: ",$0
 failedtxt:
 	dc.b	"Failed.",$0d,$0a,$0
+wrotetxt:
+	dc.b	" Wrote: ",$0
+wrotehextxt:
+	dc.b	" Wrote: 0x",$0
+readtxt:
+	dc.b	" Read: ",$0
+readhextxt:
+	dc.b	" Read: 0x",$0
+spacecolonspacetxt:
+	dc.b	" : ",$0
