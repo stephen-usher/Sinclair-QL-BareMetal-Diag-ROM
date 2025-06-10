@@ -128,5 +128,5 @@ KEYCODE_Y:		dc.b	"Y",$0
 KEYCODE_Z:		dc.b	"Z",$0
 
 key_shift_txt:	dc.b	"Shift ",$0
-key_ctl_txt:	dc.b	"Ctl ",$0
+key_ctl_txt:	dc.b	"Ctrl ",$0
 key_alt_txt:	dc.b	"Alt ",$0

@@ -682,7 +682,7 @@ scr_cls:
 	jsr	scr_cur_pos
 
 	lea	ramstart,a0
-	move.l	#$3fff,d0
+	move.l	#$7fff,d0
 
 scr_cls_loop:
 	move.b	#0,(0,a0,d0)
@@ -997,7 +997,7 @@ btoh:
 
 	and.l	#$000000ff,d1	; Mask any higher bits.
 
-	move.b	d1,d2		; Copy it to d2 so we can get the top nibble.
+	move.l	d1,d2		; Copy it to d2 so we can get the top nibble.
 	lsr.b	#4,d2
 	and.b	#$0f,d2		; Mask off the top nibble.
 	move.b	(0,a1,d2),(a0)+	; Copy the character into the bottom of d3

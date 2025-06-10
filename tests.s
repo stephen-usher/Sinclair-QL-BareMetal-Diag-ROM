@@ -91,9 +91,9 @@ ipc_reset:
 ipc_selftest:
 	movem.l	d2-d7/a0-a6,-(SP)
 
-	move.b	#$1a,d2
+	move.l	#$1a,d2
 
-	move.w	#$0FFF,d1
+	move.l	#$0FFF,d1
 
 	move.b	#$0F,d0
 	jsr	ipc_write_nibble

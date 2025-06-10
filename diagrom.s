@@ -133,6 +133,24 @@ workspace	equ	$000028200
 	org	$00000400
 
 start:
+	move.l	#0,d0
+	move.l	d0,d1
+	move.l	d0,d2
+	move.l	d0,d3
+	move.l	d0,d4
+	move.l	d0,d5
+	move.l	d0,d6
+	move.l	d0,d7
+
+	move.l	d0,a0
+	move.l	d0,a1
+	move.l	d0,a2
+	move.l	d0,a3
+	move.l	d0,a4
+	move.l	d0,a5
+	move.l	d0,a6
+	move.l	d0,a7
+
 	lea	zx83base,a0
 	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
 	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
@@ -141,10 +159,12 @@ start:
 	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
 	lea	bannertext,a5	; Put the address of the text banner into a1
 	lea	banend,a6	; Put the pointer to the return address into a6
+	moveq	#0,d2
 	bra	noram_print_string
 banend:
 	lea	memtststarttxt,a5
 	lea	memtststartend,a6
+	moveq	#1,d2
 	bra	noram_print_string
 memtststartend:
 	bra	memtest
@@ -162,12 +182,15 @@ endmemtst:
 ; a0 - IO base address
 ; a5 - address of the start of the string
 ; a6 - return address
+; d2 - character line offset from top
 ;
 ; d0, d2, , d3, d4, d5, d6, a1, a4 and a5 corrupted
 ;
 
 noram_print_string:
 	lea	ramstart,a4
+	mulu	#1280,d2	; d2 holds address offset of the character row
+	add.l	d2,a4		; Add this to the start address
 
 	move.l	#0,d0		; Set up the starting position to print onto screen
 	move.l	d0,d5
@@ -184,9 +207,9 @@ nr_p_string_loop1:
 
 nr_p_string_wait:
 ;	btst.b	#2,zx83off_r_cstatus(a0)	; See if the transmit buffer is full
-	move.b	zx83off_r_cstatus(a0),d6
-	andi.b	#$02,d6
-	cmpi.b	#$02,d6
+	move.b	zx83off_r_cstatus(a0),d4
+	andi.b	#$02,d4
+	cmpi.b	#$02,d4
 	beq	nr_p_string_wait	; If it is go around again until it's empty
 
 ; Try to write to the screen
@@ -318,6 +341,7 @@ memtstend:
 memerror:
 	lea	memerrtext,a5	; Put the address of the memory error text into a5
 	lea	memerrorprtret1,a6
+	moveq	#3,d2
 	bra	noram_print_string
 memerrorprtret1:
 	move.l	a1,d4
