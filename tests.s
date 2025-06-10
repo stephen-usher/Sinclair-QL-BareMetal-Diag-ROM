@@ -177,10 +177,22 @@ ipc_beep:
 ;
 ; init_ipc_readkey - read the keyboard
 ;
+; The first returned byte has a top status nibble.
+;
+;	0000	- No key pressed, no byte to follow.
+;	0001	- One key in buffer, byte to follow.
+;	0010	- Two(?) keys in buffer, two(?) bytes to follow.
+;	1001	- Key currently being held down, byte to follow.	
+;
+; I don't caurrently know if a value of two does mean two bytes to follow.
+;
 ;***
 
 init_ipc_readkey:
 	movem.l	d0-d7/a0-a6,-(SP)
+
+	move.w	#5,d0
+	jsr	sleep
 
 	move.w	#$0FFF,d1
 
@@ -189,29 +201,39 @@ init_ipc_readkey:
 
 	jsr	ipc_read_byte
 
-	move.b	d0,d2
-	andi.b	#$f0,d2
-	cmpi.b	#0,d2
+
+	move.b	d0,d4		; copy the status byte to d4
+	andi.b	#$f0,d4		; mask off the modifier key nibble
+	lsr.b	#4,d4		; shift down.
+
+	cmpi.b	#0,d4
 	beq	init_ipc_readkey_test_nopress
 
-	andi.b	#$0f,d0
 	move.b	d0,d2
+
+	lea	init_ipc_keyreadyes_txt,a0
+	jsr	prt_str
 
 	jsr	ipc_read_byte
 
 	move.b	d0,d3
 
-	lea	init_ipc_keyreadyes_txt,a0
-	jsr	prt_str
-
 	lea	workspace,a0
 
 	move.b	d2,d0
-	jsr	btoh
+	jsr	keymodifierstr
 	jsr	prt_str
+
 	move.b	d3,d0
-	jsr	btoh
+	jsr	keycode2str
 	jsr	prt_str
+
+	btst	#3,d4
+	beq	init_ipc_readkey_skip2
+	lea	init_ipc_keyreadyesheld_txt,a0
+	jsr	prt_str
+
+init_ipc_readkey_skip2:
 
 	bra	init_ipc_keyread_end
 

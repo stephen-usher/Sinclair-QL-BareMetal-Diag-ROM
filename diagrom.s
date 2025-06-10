@@ -410,3 +410,7 @@ end:	bra end
 	align 2
 
 	include 'strings.inc'
+
+	align 2
+
+	include 'keycodes.inc'

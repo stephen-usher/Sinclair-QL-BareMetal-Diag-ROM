@@ -1069,5 +1069,122 @@ prt_twiddle_skip1:
 	rts
 
 ;*****************************************************************************
+;
+;	keycode2str	- Convert a keycode byte to a pointer to the keycode
+;				name string.
+;
+;	Inputs:
+;
+;	d0.b	- keycode byte (valid values 0 - 63)
+;
+;	Returns:
+;
+;	a0	- Address of the string name for the keycode
+;
+;*****************************************************************************
+
+keycode2str:
+	movem.l	d0-d7/a1-a6,-(SP)
+
+	lea	keycode_table,a1
+
+	andi.l	#$3f,d0			; Make sure that we are in the range 0-63
+	mulu.w	#4,d0
+
+	move.l	(0,a1,d0),a0		; Copy the value with the byte offset in the table to a0
+
+	movem.l	(SP)+,d0-d7/a1-a6
+	rts
+
+;*****************************************************************************
+;
+;	keymodifierstr	- Convert a keycode byte to a pointer to the keycode
+;				name string.
+;
+;	NOTE: Uses workspace memory!
+;
+;	Inputs:
+;
+;	d0.b	- keycode modifier byte as returned by the IPC
+;
+;	Returns:
+;
+;	a0	- Address of the string name for the key modifier list
+;
+;*****************************************************************************
+
+keymodifierstr:
+	movem.l	d0-d7/a1-a6,-(SP)
+
+	lea	workspace,a0
+
+	move.b	#0,(a0)
+
+	andi.l	#$07,d0			; We only care about the bottom three bits
+
+
+;
+; ALT
+;
+
+	btst	#0,d0
+	beq	keymodifierstr_skip1
+
+	lea	key_alt_txt,a1
+
+keymodifierstr_loop1:
+	cmpi.b	#0,(a1)
+	beq	keymodifierstr_loop1_end
+	move.b	(a1)+,(a0)+
+	bra	keymodifierstr_loop1
+keymodifierstr_loop1_end:
+
+keymodifierstr_skip1:
+
+
+;
+; CTRL
+;
+
+	btst	#1,d0
+	beq	keymodifierstr_skip2
+
+	lea	key_ctl_txt,a1
+
+keymodifierstr_loop2:
+	cmpi.b	#0,(a1)
+	beq	keymodifierstr_loop2_end
+	move.b	(a1)+,(a0)+
+	bra	keymodifierstr_loop2
+keymodifierstr_loop2_end:
+
+keymodifierstr_skip2:
+
+;
+; SHIFT
+;
+
+	btst	#2,d0
+	beq	keymodifierstr_skip3
+
+	lea	key_shift_txt,a1
+
+keymodifierstr_loop3:
+	cmpi.b	#0,(a1)
+	beq	keymodifierstr_loop3_end
+	move.b	(a1)+,(a0)+
+	bra	keymodifierstr_loop3
+keymodifierstr_loop3_end:
+
+keymodifierstr_skip3:
+
+	move.b	#0,(a0)
+
+	lea	workspace,a0
+
+	movem.l	(SP)+,d0-d7/a1-a6
+	rts
+
+;*****************************************************************************
 ; End of utility library functions.
 ;*****************************************************************************

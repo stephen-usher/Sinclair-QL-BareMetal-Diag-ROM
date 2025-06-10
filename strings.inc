@@ -8,6 +8,7 @@
 escbrack:	dc.b	$1b,"[",$0
 clrandhome:	dc.b	$1b,"[2J",$1b,"[H",$0
 crlftxt:	dc.b	$0d,$0a,$0
+spacetxt:	dc.b	" ",$0
 
 bannertext:
 	dc.b	"QL Bare Metal Diagnostic ROM version 0.00",$0d,$0a,$0
@@ -26,11 +27,13 @@ init_ipc_selftest_txt:
 init_ipc_beeptest_txt:
 	dc.b	"IPC beep test: ",$0
 init_ipc_keyreadtest_txt:
-	dc.b	"IPC read keyboard test: ",$0
+	dc.b	"IPC read keyboard test: Press keyboard key within 5 seconds",$0d,$0a,$0
 init_ipc_keyreadyes_txt:
-	dc.b	"Key was pressed: 0x",$0
+	dc.b	"Key pressed was: ",$0
+init_ipc_keyreadyesheld_txt:
+	dc.b	" and it was held down",$0
 init_ipc_keyreadno_txt:
-	dc.b	"Key wasn't pressed: ",$0
+	dc.b	"No key was pressed",$0d,$0a,$0
 
 qtclocktxt:
 	dc.b	"Testing clock.",$0d,$0a,$0
