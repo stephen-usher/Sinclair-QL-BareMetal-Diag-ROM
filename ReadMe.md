@@ -22,6 +22,8 @@ The serial conection on ser2 runs at 4800 baud. Almost the very first thing the 
 
 The ROM will then run a couple of thorough memory tests on the lower 128K of RAM. Firstly an 'own address' test and then a full March test. The combination of these should catch any bad bits or addressing errors.
 
+If there is a lower RAM error it will print the error address and bad bits on the serial port and put a series of bands across the screen. The first is white or black showing which memory bank the error occured within, white lower, black higher. This is followed by 8 bands for the 8 bits, 7 -> 0. A green band is good and a red band bad.
+
 Once the ROM has determined that RAM is usable it can start running more fully, first checking the IPC for functionality and then bringing up a menu of further tests. This can be accessed either via the serial port or on the main screen if the display is working.
 
 This ROM is just another tool in the diagnostic arsnal. If it doesn't work then that probably says something about the state or the ULAs or the CPU and an oscilloscope would be your best bet at that point.

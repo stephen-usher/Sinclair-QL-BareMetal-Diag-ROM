@@ -158,15 +158,21 @@ start:
 	move.b	#$01,zx83off_w_ipcwreg(a0)	; Reset the IPC
 	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
 	lea	bannertext,a5	; Put the address of the text banner into a1
-	lea	banend,a6	; Put the pointer to the return address into a6
+	lea	banend1,a6	; Put the pointer to the return address into a6
+	bra	noram_print_string
+banend1:
+	lea	banend2,a6	; Put the pointer to the return address into a6
 	moveq	#0,d2
-	bra	noram_print_string
-banend:
+	bra	noram_print_string_scr
+banend2:
 	lea	memtststarttxt,a5
-	lea	memtststartend,a6
-	moveq	#1,d2
+	lea	memtststartend1,a6
 	bra	noram_print_string
-memtststartend:
+memtststartend1:
+	moveq	#1,d2
+	lea	memtststartend2,a6
+	bra	noram_print_string_scr
+memtststartend2:
 	bra	memtest
 endmemtst:
 
@@ -174,205 +180,8 @@ endmemtst:
 
 	bra	main
 
-;
-; noram_print_string
-;
-; Print a NULL terminated string to the serial port without RAM
-;
-; a0 - IO base address
-; a5 - address of the start of the string
-; a6 - return address
-; d2 - character line offset from top
-;
-; d0, d2, , d3, d4, d5, d6, a1, a4 and a5 corrupted
-;
-
-noram_print_string:
-	lea	ramstart,a4
-	mulu	#1280,d2	; d2 holds address offset of the character row
-	add.l	d2,a4		; Add this to the start address
-
-	move.l	#0,d0		; Set up the starting position to print onto screen
-	move.l	d0,d5
-
-
-nr_p_string_loop1:
-	move.l	#0,d6		; clear out d6
-	move.b	(a5)+,d6	; Copy character into d6 and increment a5
-
-	tst.b	d6		; Is it a NULL byte?
-	beq	nr_p_string_end		; If so finish
-
-	move.b	d6,zx83off_w_transdata(a0)	; Transmit the character.
-
-nr_p_string_wait:
-;	btst.b	#2,zx83off_r_cstatus(a0)	; See if the transmit buffer is full
-	move.b	zx83off_r_cstatus(a0),d4
-	andi.b	#$02,d4
-	cmpi.b	#$02,d4
-	beq	nr_p_string_wait	; If it is go around again until it's empty
-
-; Try to write to the screen
-
-	mulu	#2,d0		; The X offset is two bytes so double d0
-
-	sub.l	#31,d6		; Subtract 31 as the font table doesn't have non-printable characters.
-	mulu	#10,d6		; Set the offset of the character in the font table (each entry is 10 bytes long)
-
-	lea	font_char0,a1	; Load the start address of the font table into a1.
-	add.l	d6,a1		; Point to the start of the character.
-
-	move.l	#8,d3		; Set up the loop counter
-
-nr_prt_chr_loop:
-	move.b	#8,d4			; Set the d4 to be the offset to
-	sub.b	d3,d4			; the current scanline of the character.
-	move.b	(0,a1,d4),(0,a4,d0)	; Write the font byte to the screen.
-	move.b	(0,a1,d4),(1,a4,d0)	; Write the font byte to the screen.
-	add.l	#128,d0			; Increment the pointer to the next scanline.
-	dbf	d3,nr_prt_chr_loop     ; Go around again if we haven't done all the lines.
-
-	add.b	#1,d5			; Move the cursor to the right
-	move.l	d5,d0
-
-	bra	nr_p_string_loop1	; Print the next character
-
-nr_p_string_end:
-	mulu	#2,d0
-	move.l	#8,d3
-nrpdendlp:
-	move.b	#$FF,(0,a4,d0)
-	add.l	#128,d0
-	dbf	d3,nrpdendlp
-
-	jmp	(a6)
-
-memtstsizel	equ	$7fff
-memtstsizeh	equ	$0001
-	
-memtest:
-	move.l	#1,d2		; Memory test 1
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#0,d3
-ownaddrwr:
-	move.b	d3,(a1)+	; Write the lower byte to RAM
-	add.l	#1,d3
-	dbf	d0,ownaddrwr	; Go around until the end of memory
-	dbf	d1,ownaddrwr
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#0,d3
-ownaddrrd:
-	cmp.b	(a1),d3	; Test if the memory matches the lowest byte of the address.
-	bne	memerror	; Error if not the same.
-	add.l	#1,a1
-	add.l	#1,d3
-	dbf	d0,ownaddrrd	; Go around until end of memory
-	dbf	d1,ownaddrrd
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-marchtestp1:
-	move.b	#$FF,(a1)+	; Write a byte of 1s to RAM.
-	dbf	d0,marchtestp1	; Go around until all RAM has been filled.
-	dbf	d1,marchtestp1	; Go around until all RAM has been filled.
-
-	move.l	#2,d2		; Memory test 2
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#$000000FF,d3
-marchtestp2:
-	cmpi.b	#$FF,(a1)	; Test if what we read is what we wrote.
-	bne	memerror	; If it's not error and halt.
-	eori.b	#-1,(a1)+	; XOR the memory value with all ones.
-	dbf	d0,marchtestp2	; Go around again until all memory has been done.
-	dbf	d1,marchtestp2	; Go around again until all memory has been done.
-
-	move.l	#3,d2		; Memory test 3
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#$00000000,d3
-marchtestp3:
-	cmpi.b	#$00,(a1)	; Test if what we read is the opposite of what we wrote.
-	bne	memerror	; If it's not error and halt.
-	eori.b	#-1,(a1)+	; XOR the memory value with all ones.
-	dbf	d0,marchtestp3	; Go around again until all memory has been done.
-	dbf	d1,marchtestp3	; Go around again until all memory has been done.
-
-	move.l	#4,d2		; Memory test 4
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#$000000FF,d3
-marchtestp4:
-	cmpi.b	#$FF,(a1)	; Test if what we read is what we wrote originally.
-	bne	memerror	; If it's not error and halt.
-	eori.b	#-1,(a1)+	; XOR the memory value with all ones.
-	dbra	d0,marchtestp4	; Go around again until all memory has been done.
-	dbra	d1,marchtestp4	; Go around again until all memory has been done.
-
-memtstend:
-
-	bra	endmemtst	; The memory test has completed successfully.
-
-memerror:
-	lea	memerrtext,a5	; Put the address of the memory error text into a5
-	lea	memerrorprtret1,a6
-	moveq	#3,d2
-	bra	noram_print_string
-memerrorprtret1:
-	move.l	a1,d4
-	move.b	(a1),d0
-	eor.b	d3,d0
-	moveq	#7,d1
-memerrorbiterrorloop:
-	move.b	d1,d5
-	addi.b	#$30,d5
-	btst.l	d1,d0
-	bne	memerrorbiterrorskip
-	move.b	d5,$22(a0)
-memerrorbiterrorskip:
-	dbf	d1,memerrorbiterrorloop
-
-	lea	ramstart,a1
-	rol.b	#2,d2
-	adda.l	d2,a1
-eloopy:
-	move.l	#$0000FFFF,d0
-eloopy2:
-	move.w	d0,(a1)
-	move.w	d0,128(a1)
-	move.w	d0,256(a1)
-	move.w	d0,384(a1)
-	move.w	d0,512(a1)
-	move.w	d0,640(a1)
-	move.w	d0,768(a1)
-	move.w	d0,896(a1)
-	dbeq	d0,eloopy2
-	bra	eloopy
+	include 'noramprt.s'
+	include	'norammemtst.s'
 
 buserr:
 addresserr:

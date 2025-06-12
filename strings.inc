@@ -15,7 +15,9 @@ bannertext:
 memtststarttxt:
 	dc.b	"Starting initial 128K memory test.",$0d,$0a,$0
 memerrtext:
-	dc.b	"Memory test error, halting.",$0d,$0a,$0
+	dc.b	"Memory error at address 0x",$0
+memerrbitstxt:
+	dc.b	" bad bits: ",$0
 memtstcomptext:
 	dc.b	"Initial memory test complete.",$0d,$0a,$0
 init_ipc_start_txt:
