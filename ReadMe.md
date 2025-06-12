@@ -24,8 +24,10 @@ The ROM will then run a couple of thorough memory tests on the lower 128K of RAM
 
 If there is a lower RAM error it will print the error address and bad bits on the serial port and put a series of bands across the screen. The first is white or black showing which memory bank the error occured within, white lower, black higher. This is followed by 8 bands for the 8 bits, 7 -> 0. A green band is good and a red band bad.
 
-Once the ROM has determined that RAM is usable it can start running more fully, first checking the IPC for functionality and then bringing up a menu of further tests. This can be accessed either via the serial port or on the main screen if the display is working.
+Once the base 128K RAM is known to work the ROM will do some initial tests such as reading the clock and checking out the IPC functionality, including reading the keyboard.
 
-This ROM is just another tool in the diagnostic arsnal. If it doesn't work then that probably says something about the state or the ULAs or the CPU and an oscilloscope would be your best bet at that point.
+The plan is that once these initial tests are complete that the ROM will being up a menu to allow interactive tests to be performed.
+
+This ROM is just another tool in the diagnostic arsnal. If it doesn't work then that probably says something about the state of the ULAs or the CPU and an oscilloscope would be your best bet at that point.
 
 You will need the vasm assembler built for the 68000 processor with Motorola syntax enabled and make to build the ROM image.
