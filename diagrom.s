@@ -51,6 +51,7 @@
 	org	$00000000
 
 startsp		equ	$0003FFF0
+startusp	equ	$0003a000
 
 zx83base	equ	$00018000
 
@@ -170,6 +171,11 @@ start:
 	move.l	d0,a6
 	move.l	d0,a7
 
+	move.l	startusp,a0
+	move	a0,usp
+	move.l	startsp,a0
+	move	a0,sp
+
 	lea	zx83base,a0
 	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
 ;	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
@@ -197,11 +203,12 @@ endmemtst:
 
 	lea	startsp,sp
 	lea	zx83base,a0
-;	move.b	#%01011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+	move.b	#%00011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
 	lea	sysvarbase,a0
-	move.b	#%01000000,sysv_intermask(a0)
-	move.b	#0,sysv_idisable(a0)
-;	andi.w	#%1111100111111111,SR
+	move.b	#%00000000,sysv_intermask(a0)
+
+	move.b	#0,sysv_idisable(a0)	; Enable interrupts
+	andi.w	#%1111100011111111,SR
 
 	bra	main
 
@@ -229,15 +236,12 @@ intvec5:
 intvec6:
 intvec7:
 ; Interrupt handler.
-	eori.w	#$10,SR
+;	move	sr,-(SP)
+	or.w	#$700,sr
 	movem.l	d0-d7/a0-a6,-(SP)
 
 	lea	sysvarbase,a1
 	lea	zx83base,a2
-
-	move.b	sysv_intermask(a1),d0
-	ori.b	#%00011111,d0
-;	move.b	d0,zx83off_w_imaskreg(a2)
 
 	cmpi.b	#1,sysv_idisable(a1)
 	beq	int_handler_end
@@ -270,9 +274,13 @@ int_handler_notser2:
 
 int_handler_end:
 
+	move.b	sysv_intermask(a1),d0
+	ori.b	#%00011111,d0
+	move.b	d0,zx83off_w_imaskreg(a2)
+
 	movem.l	(SP)+,d0-d7/a0-a6
-	eori.w	#$10,SR
-	rte
+	move	(SP)+,sr
+	rts
 
 trapvec:
 	rte

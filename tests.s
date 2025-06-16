@@ -207,15 +207,8 @@ init_ipc_readkey:
 	move.w	#5,d0
 	jsr	sleep
 
-;	jsr	ipc_read_keyboard
-
 	cmpi.w	#0,(a2)
 	beq	init_ipc_readkey_test_nopress
-
-;	move.b	(a3),d4		; copy the status byte to d4
-
-;	cmpi.b	#0,d4
-;	beq	init_ipc_readkey_test_nopress
 
 	move.b	(a3),d2
 	move.b	1(a3),d3
@@ -232,6 +225,13 @@ init_ipc_readkey:
 	move.b	d3,d0
 	jsr	keycode2str
 	jsr	prt_str
+
+	btst	#3,d2
+	beq	init_ipc_readkey_skip2
+	lea	init_ipc_keyreadyesheld_txt,a0
+	jsr	prt_str
+
+init_ipc_readkey_skip2:
 
 	bra	init_ipc_keyread_end
 

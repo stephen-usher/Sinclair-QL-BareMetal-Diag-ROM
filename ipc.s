@@ -321,6 +321,14 @@ ipc_read_bit_loop1_end:
 ipc_read_keyboard:
 	movem.l	d0-d7/a0-a6,-(SP)
 
+; d0 holds the status byte... so we can obtain information about if a key is held down
+
+	move.l	#0,d6
+	btst	#3,d0
+	beq	ipc_read_keyboard_notheld
+	move.l	#$8,d6
+ipc_read_keyboard_notheld:
+
 	lea	kbd_buffer,a0	; Put the base address of the keyboard buffer into a0
 	lea	kbd_buf_offset,a1
 	move.w	(a1),d4			; Load the current keyboard buffer counter into d4
@@ -347,6 +355,7 @@ ipc_read_keyboard:
 ipc_read_keyboard_loop1:
 	jsr	ipc_read_nibble
 	move.b	d0,d2			; Copy the status nibble into d2
+	or.b	d6,d2			; Merge the held bit into d2
 	jsr	ipc_read_byte
 	move.b	d0,d3			; Copy the key column/row into d3
 
