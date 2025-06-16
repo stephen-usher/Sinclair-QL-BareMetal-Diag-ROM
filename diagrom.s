@@ -93,8 +93,27 @@ sysv_cur_y	equ	$1
 sysv_cur_twd	equ	$2
 sysv_ramtop	equ	$4
 sysv_ramsiz	equ	$8
+sysv_ipcintreg	equ	$12
+sysv_intermask	equ	$14
+sysv_idisable	equ	$18
 
-workspace	equ	$000028200
+;
+; Keyboard buffer: 32 words
+;
+kbd_buf_offset	equ	$000028200
+kbd_buffer	equ	$000028202
+;
+; Ser1 receive buffer: 1K
+;
+ser1_buf_count	equ	$000028242	; One word.
+ser1_buffer	equ	$000028244	; 1024 bytes
+;
+; Ser2 receive buffer: 1K
+;
+ser2_buf_count	equ	$000028644	; One word.
+ser2_buffer	equ	$000028646	; 1024 bytes
+
+workspace	equ	$00002a000	; Generic workspace.
 
 	dc.l	startsp
 	dc.l	start
@@ -177,6 +196,12 @@ memtststartend2:
 endmemtst:
 
 	lea	startsp,sp
+	lea	zx83base,a0
+	move.b	#%01011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+	lea	sysvarbase,a0
+	move.b	#%01000000,sysv_intermask(a0)
+	move.b	#0,sysv_idisable(a0)
+	andi.w	#%1111100011111111,SR
 
 	bra	main
 
@@ -195,6 +220,7 @@ linea:
 linef:
 unintvec:
 spurint:
+	rte
 intvec1:
 intvec2:
 intvec3:
@@ -202,8 +228,50 @@ intvec4:
 intvec5:
 intvec6:
 intvec7:
+; Interrupt handler.
+	ori.w	#$70,SR
+	movem.l	d0-d7/a0-a6,-(SP)
+
+	lea	sysvarbase,a1
+	lea	zx83base,a2
+
+	cmpi.b	#1,sysv_idisable(a1)
+	beq	int_handler_end
+
+	move.b	#$1,d0
+	jsr	ipc_write_nibble
+
+	jsr	ipc_read_byte
+
+	move.b	d0,sysv_ipcintreg(a1)
+
+	btst	#0,d0
+	beq	int_handler_notkbd
+	jsr	ipc_read_keyboard
+int_handler_notkbd:
+
+	btst	#4,d0
+	beq	int_handler_notser1
+	jsr	ipc_read_ser1
+int_handler_notser1:
+
+	btst	#5,d0
+	beq	int_handler_notser2
+	jsr	ipc_read_ser2
+int_handler_notser2:
+
+	move.b	sysv_intermask(a1),d0
+	ori.b	#%00011111,d0
+	move.b	d0,zx83off_w_imaskreg(a2)
+
+int_handler_end:
+
+	movem.l	(SP)+,d0-d7/a0-a6
+	andi.w	#%1111100011111111,SR
+	rte
+
 trapvec:
-	bra end
+	rte
 
 	align 2
 
@@ -235,6 +303,7 @@ main:
 
 end:	bra end
 
+	include 'ipc.s'
 
 	align 2
 

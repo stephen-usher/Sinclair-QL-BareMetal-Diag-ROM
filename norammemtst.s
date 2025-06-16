@@ -12,34 +12,6 @@ memtest:
 	move.l	#0,d3
 	move.l	#0,d4
 
-	move.l	#1,d2		; Memory test 1
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#0,d3
-ownaddrwr:
-	move.b	d3,(a1)+	; Write the lower byte to RAM
-	add.l	#1,d3
-	dbf	d0,ownaddrwr	; Go around until the end of memory
-	dbf	d1,ownaddrwr
-
-	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
-	move.l	#memtstsizeh,d1
-
-	lea	ramstart,a1	; Load the base of RAM into a1
-
-	move.l	#0,d3
-ownaddrrd:
-	move.b	(a1),d4
-	cmp.b	d4,d3	; Test if the memory matches the lowest byte of the address.
-	bne	memerror	; Error if not the same.
-	add.l	#1,a1
-	add.l	#1,d3
-	dbf	d0,ownaddrrd	; Go around until end of memory
-	dbf	d1,ownaddrrd
 
 	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
 	move.l	#memtstsizeh,d1
@@ -99,8 +71,36 @@ marchtestp4:
 	dbra	d0,marchtestp4	; Go around again until all memory has been done.
 	dbra	d1,marchtestp4	; Go around again until all memory has been done.
 
-memtstend:
+	move.l	#1,d2		; Memory test 1
 
+	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
+	move.l	#memtstsizeh,d1
+
+	lea	ramstart,a1	; Load the base of RAM into a1
+
+	move.l	#0,d3
+ownaddrwr:
+	move.b	d3,(a1)+	; Write the lower byte to RAM
+	add.l	#1,d3
+	dbf	d0,ownaddrwr	; Go around until the end of memory
+	dbf	d1,ownaddrwr
+
+	move.l	#memtstsizel,d0	; Set up the RAM test loop counters
+	move.l	#memtstsizeh,d1
+
+	lea	ramstart,a1	; Load the base of RAM into a1
+
+	move.l	#0,d3
+ownaddrrd:
+	move.b	(a1),d4
+	cmp.b	d4,d3	; Test if the memory matches the lowest byte of the address.
+	bne	memerror	; Error if not the same.
+	add.l	#1,a1
+	add.l	#1,d3
+	dbf	d0,ownaddrrd	; Go around until end of memory
+	dbf	d1,ownaddrrd
+
+memtstend:
 	bra	endmemtst	; The memory test has completed successfully.
 
 ; memerror
