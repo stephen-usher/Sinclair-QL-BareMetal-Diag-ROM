@@ -18,7 +18,7 @@ init_ipc_test:
 
 	lea	sysvarbase,a5
 
-	ori.w	#$70,SR			; turn off interrupts for the first tests.
+;	ori.w	#$70,SR			; turn off interrupts for the first tests.
 	move.b	#1,sysv_idisable(a5)	; And flag this in the system variables.
 
 	lea	init_ipc_start_txt,a0
@@ -41,7 +41,7 @@ init_ipc_test:
 	lea	init_ipc_selftest_txt,a0
 	jsr	prt_str
 
-;	jsr	ipc_selftest
+	jsr	ipc_selftest
 
 	tst.b	d1
 	beq	init_ipc_test_fail
@@ -58,7 +58,7 @@ init_ipc_test:
 	jsr	prt_str
 
 	move.b	#0,sysv_idisable(a5)		; Remove the no interrupt flag in the system variables
-	andi.w	#%1111100011111111,SR		; Turn interrupts back on for the rest of the tests.
+;	andi.w	#%1111100011111111,SR		; Turn interrupts back on for the rest of the tests.
 
 	lea	init_ipc_keyreadtest_txt,a0
 	jsr	prt_str

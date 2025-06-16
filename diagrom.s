@@ -172,7 +172,7 @@ start:
 
 	lea	zx83base,a0
 	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
-	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+;	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
 	move.b	#%00001010,zx83off_w_transreg(a0)	; Set the ouput serial port settings (ser2, 4800 baud)
 	move.b	#$01,zx83off_w_ipcwreg(a0)	; Reset the IPC
 	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
@@ -197,11 +197,11 @@ endmemtst:
 
 	lea	startsp,sp
 	lea	zx83base,a0
-	move.b	#%01011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+;	move.b	#%01011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
 	lea	sysvarbase,a0
 	move.b	#%01000000,sysv_intermask(a0)
 	move.b	#0,sysv_idisable(a0)
-	andi.w	#%1111100011111111,SR
+;	andi.w	#%1111100111111111,SR
 
 	bra	main
 
@@ -229,21 +229,27 @@ intvec5:
 intvec6:
 intvec7:
 ; Interrupt handler.
-	ori.w	#$70,SR
+	eori.w	#$10,SR
 	movem.l	d0-d7/a0-a6,-(SP)
 
 	lea	sysvarbase,a1
 	lea	zx83base,a2
 
+	move.b	sysv_intermask(a1),d0
+	ori.b	#%00011111,d0
+;	move.b	d0,zx83off_w_imaskreg(a2)
+
 	cmpi.b	#1,sysv_idisable(a1)
 	beq	int_handler_end
+
+	move.b	#1,sysv_idisable(a1)		; Stop re-entry of the interrupt routine
+
+	move.l	#$0fff,d1
 
 	move.b	#$1,d0
 	jsr	ipc_write_nibble
 
 	jsr	ipc_read_byte
-
-	move.b	d0,sysv_ipcintreg(a1)
 
 	btst	#0,d0
 	beq	int_handler_notkbd
@@ -260,14 +266,12 @@ int_handler_notser1:
 	jsr	ipc_read_ser2
 int_handler_notser2:
 
-	move.b	sysv_intermask(a1),d0
-	ori.b	#%00011111,d0
-	move.b	d0,zx83off_w_imaskreg(a2)
+	move.b	#0,sysv_idisable(a1)
 
 int_handler_end:
 
 	movem.l	(SP)+,d0-d7/a0-a6
-	andi.w	#%1111100011111111,SR
+	eori.w	#$10,SR
 	rte
 
 trapvec:
