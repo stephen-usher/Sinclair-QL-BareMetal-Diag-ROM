@@ -10,8 +10,11 @@ clrandhome:	dc.b	$1b,"[2J",$1b,"[H",$0
 crlftxt:	dc.b	$0d,$0a,$0
 spacetxt:	dc.b	" ",$0
 
+end_basic_test_txt:
+	dc.b	"Basic tests completed.",$0d,$0a,0
+
 bannertext:
-	dc.b	"QL Bare Metal Diagnostic ROM version 0.00",$0d,$0a,$0
+	dc.b	"QL Bare Metal Diagnostic ROM version 0.10",$0d,$0a,$0
 memtststarttxt:
 	dc.b	"Starting initial 128K memory test.",$0d,$0a,$0
 memerrtext:

@@ -887,5 +887,150 @@ keymodifierstr_skip3:
 	rts
 
 ;*****************************************************************************
+;
+;	read_keyboard	-	Read the keyboard queue
+;
+;	Inputs:
+;
+;	a0	-	Address of memory into which keydefs are copied.
+;				Must be at least 64 bytes.
+;
+;	Returns:
+;
+;	d0.b	-	Number of keydefs returned
+;
+;*****************************************************************************
+
+read_keyboard:
+	movem.l	d1-d7/a0-a6,-(SP)
+
+	move.l	d0,d1
+
+	move.l	#0,d0			; Clear out d0 completely.
+
+	lea	sysvarbase,a3
+	move.b	#1,sysv_idisable(a3)	; Disable IPC interrupt handling
+
+	lea	kbd_buf_offset,a1
+	move.w	(a1),d0
+	move.l	d0,d1
+	lsl.w	#1,d1
+
+	cmpi.b	#0,d0			; Are there any keydefs in the buffer?
+	beq	read_keyboard_end
+
+	lea	kbd_buffer,a2
+
+	subi.b	#1,d1
+
+read_keyboard_loop1:
+	move.w	(a2)+,(a0)+
+	dbf	d1,read_keyboard_loop1
+
+	move.w	#0,(a1)			; Reset the buffer count.
+
+read_keyboard_end:
+	move.b	#0,sysv_idisable(a3)	; Re-enable IPC interrupt handling
+
+	movem.l	(SP)+,d1-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	read_ser1	-	Read the keyboard queue
+;
+;	Inputs:
+;
+;	a0	-	Address of memory into which data bytes are copied.
+;				Must be at least 1K bytes.
+;
+;	Returns:
+;
+;	d0.b	-	Number of bytes returned
+;
+;*****************************************************************************
+
+read_ser1:
+	movem.l	d1-d7/a0-a6,-(SP)
+
+	move.l	#0,d0			; Clear out d0 completely.
+
+	lea	sysvarbase,a3
+	move.b	#1,sysv_idisable(a3)	; Disable IPC interrupt handling
+
+	lea	ser1_buf_count,a1
+	move.w	(a1),d0
+
+	cmpi.b	#0,d0			; Are there any bytes in the buffer?
+	beq	read_ser1_end
+
+	lea	ser1_buffer,a2
+
+	subi.b	#1,d0
+	andi.w	#$3ff,d0		; Make sure it's within the maximum size
+	move.l	d0,d1			; Copy to the loop variable
+	addi.w	#1,d0			; increase it back to the correct value
+
+read_ser1_loop1:
+	move.b	(a2)+,(a0)+
+	dbf	d1,read_ser1_loop1
+
+	move.w	#0,(a1)			; Reset the buffer count.
+
+read_ser1_end:
+	move.b	#0,sysv_idisable(a3)	; Re-enable IPC interrupt handling
+
+	movem.l	(SP)+,d1-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	read_ser2	-	Read the keyboard queue
+;
+;	Inputs:
+;
+;	a0	-	Address of memory into which data bytes are copied.
+;				Must be at least 1K bytes.
+;
+;	Returns:
+;
+;	d0.b	-	Number of bytes returned
+;
+;*****************************************************************************
+
+read_ser2:
+	movem.l	d1-d7/a0-a6,-(SP)
+
+	move.l	#0,d0			; Clear out d0 completely.
+
+	lea	sysvarbase,a3
+	move.b	#1,sysv_idisable(a3)	; Disable IPC interrupt handling
+
+	lea	ser2_buf_count,a1
+	move.w	(a1),d0
+
+	cmpi.b	#0,d0			; Are there any bytes in the buffer?
+	beq	read_ser2_end
+
+	lea	ser2_buffer,a2
+
+	subi.b	#1,d0
+	andi.w	#$3ff,d0		; Make sure it's within the maximum size
+	move.l	d0,d1			; Copy to the loop variable
+	addi.w	#1,d0			; increase it back to the correct value
+
+read_ser2_loop1:
+	move.b	(a2)+,(a0)+
+	dbf	d1,read_ser2_loop1
+
+	move.w	#0,(a1)			; Reset the buffer count.
+
+read_ser2_end:
+	move.b	#0,sysv_idisable(a3)	; Re-enable IPC interrupt handling
+
+	movem.l	(SP)+,d1-d7/a0-a6
+	rts
+
+;*****************************************************************************
 ; End of utility library functions.
 ;*****************************************************************************

@@ -18,7 +18,6 @@ init_ipc_test:
 
 	lea	sysvarbase,a5
 
-;	ori.w	#$70,SR			; turn off interrupts for the first tests.
 	move.b	#1,sysv_idisable(a5)	; And flag this in the system variables.
 
 	lea	init_ipc_start_txt,a0
@@ -58,14 +57,13 @@ init_ipc_test:
 	jsr	prt_str
 
 	move.b	#0,sysv_idisable(a5)		; Remove the no interrupt flag in the system variables
-;	andi.w	#%1111100011111111,SR		; Turn interrupts back on for the rest of the tests.
 
 	lea	init_ipc_keyreadtest_txt,a0
 	jsr	prt_str
 
 	jsr	init_ipc_readkey
 
-;	jsr	init_ipc_serial
+	jsr	init_ipc_serial
 
 	movem.l	(SP)+,d1-d7/a0-a6
 	rts
@@ -165,7 +163,7 @@ init_ipc_beep:
 	move.w	#$5678,d0		; Step interval
 	jsr	ipc_write_word
 
-	move.w	#$9abc,d0		; duration
+	move.w	#$abcd,d0		; duration
 	jsr	ipc_write_word
 
 	move.b	#2,d0			; pitch step
@@ -200,23 +198,23 @@ init_ipc_beep:
 init_ipc_readkey:
 	movem.l	d0-d7/a0-a6,-(SP)
 
-	lea	kbd_buffer,a3
-	lea	kbd_buf_offset,a2
-	move.w	#0,(a2)
+	lea	workspace,a0
+
+	jsr	read_keyboard
 
 	move.w	#5,d0
 	jsr	sleep
 
-	cmpi.w	#0,(a2)
+	jsr	read_keyboard
+
+	cmpi.w	#0,d0
 	beq	init_ipc_readkey_test_nopress
 
-	move.b	(a3),d2
-	move.b	1(a3),d3
+	move.b	(a0),d2
+	move.b	1(a0),d3
 
 	lea	init_ipc_keyreadyes_txt,a0
 	jsr	prt_str
-
-	lea	workspace,a0
 
 	move.b	d2,d0
 	jsr	keymodifierstr
@@ -258,114 +256,64 @@ init_ipc_serial:
 	movem.l	d0-d7/a0-a6,-(SP)
 
 	move.w	#$0FFF,d1
-	lea	workspace,a0
-
-	lea	sysvarbase,a2
 
 	move.l	#0,d0
-
-; Set the baud rate
-
-	move.b	#$d,d0
-	jsr	ipc_write_nibble
-
-; 4800	
+	move.l	#10,d5
 
 	move.b	#$2,d0
-	jsr	ipc_write_nibble
-	
-; Set the baud rate
+	jsr	set_input_baud
 
-	move.b	#$d,d0
-	jsr	ipc_write_nibble
+	jsr	open_ser2
 
-; 4800	
+	lea	workspace,a1		; Storage for the data bytes, 1K
+	lea	workspace+1024,a2	; Our workspace storage.
 
-	move.b	#$2,d0
-	jsr	ipc_write_nibble
-	
-; Open ser2
+	lea	ipc_serial_txt1,a0
+	jsr	prt_str
 
-	move.b	#$3,d0
-	jsr	ipc_write_nibble
-
-; Let's read ser2 continuously
-
-init_ipc_serial_loop1:
-	move.w	#1,d0
+	move.l	#5,d0
 	jsr	sleep
 
+	move.l	a1,a0
+
+	jsr	read_ser2	; Loop around until we recieve some bytes
+
+	cmpi.w	#0,d0
+	beq	init_serial_nobytes
+
+	lea	ipc_serial_txt2,a0
+	jsr	prt_str
+
+	move.l	a2,a0		; Put our workspace pointer into a0
+	move.l	d0,d2		; d0 holds the number of bytes in the returned buffer
+	subi.w	#1,d2		; Create a loop variable
+	move.l	a1,a3		; Working copy of the data pointer
+
+	move.l	a1,a0
+	move.b	#0,(0,a0,d0)	; Add a NULL to the end of the workspace
+	jsr	prt_str
+
 	lea	crlftxt,a0
-	jsr	prt_str
-	lea	workspace,a0
+	jsr	prt_str	
 
-; Read the interrupt status
+	bra	init_serial_end
 
-	move.b	sysv_intermask,d0
-
-	lea	workspace,a0
-	jsr	btoh
-	move.b	#45,2(a0)	; Add a space to the end.
-	move.b	#0,3(a0)	; And a NULL
+init_serial_nobytes:
+	lea	ipc_serial_txt3,a0
 	jsr	prt_str
 
-;	move.b	d0,d1
-;	andi.b	#$0f,d1
-;	cmpi.b	#$0f,d1
-;	beq	init_ipc_serial_loop1
-
-	move.b	d0,d1
-	andi.b	#$80,d1
-	cmpi.b	#$80,d1
-	beq	init_ipc_serial_loop1
-
-	andi.b	#$20,d0
-	cmpi.b	#$20,d0
-	bne	init_ipc_serial_loop1
-
-	move.b	#$7,d0
-	jsr	ipc_write_nibble
-
-	jsr	ipc_read_byte
-
-
-	jsr	btoh
-	move.b	#$3a,2(a0)	; Add a colon to the end.
-	move.b	#0,3(a0)	; And a NULL
-	jsr	prt_str
-
-	move.l	#0,d3
-	move.b	d0,d3		; Methinks this is number of bytes available to read
-	subi.b	#1,d3
-
-	cmpi.b	#2,d3
-	bgt	init_ipc_serial_loop1
-
-
-init_ipc_serial_loop2:
-	jsr	ipc_read_byte
-	lea	workspace,a0
-	jsr	btoh
-	move.b	#32,2(a0)	; Add a space to the end.
-	move.b	#0,3(a0)	; And a NULL
-	jsr	prt_str
-	dbf	d3,init_ipc_serial_loop2
-
-; Close ser2
-
-	move.b	#$5,d0
-	jsr	ipc_write_nibble
-
-; Open ser2
-
-	move.b	#$3,d0
-	jsr	ipc_write_nibble
-
-	bra init_ipc_serial_loop1	
-	
+init_serial_end:
 
 	movem.l (SP)+,d0-d7/a0-a6
 	rts
+
+ipc_serial_txt1:	dc.b	"Serial port test: Send data to ser2 within 5 seconds",$d,$a,0
+ipc_serial_txt2:	dc.b	"Bytes ready: ",0
+ipc_serial_txt3:	dc.b	"No bytes ready.",$d,$a,0
+
+	align	2
+
+
 ;***
 ;
 ; quick_test_clock - Quickly test the clock is running.

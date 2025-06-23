@@ -384,18 +384,21 @@ ipc_read_ser1:
 	movem.l	d0-d7/a0-a6,-(SP)
 
 	lea	ser1_buffer,a0	; Put the base address of the ser1 buffer into a0
-	lea	kbd_buf_offset,a1
-	move.w	(a1),d4			; Load the current keyboard buffer counter into d4
+	lea	ser1_buf_count,a1
+	lea	sysvarbase,a2
+	addi.l	#1,sysv_intcount1(a2)
 
-	move.w	#$ffff,d1
+	move.w	(a1),d4			; Load the current ser1 buffer counter into d4
+
+	move.w	#$0fff,d1
 
 	move.l	#6,d0
 	jsr	ipc_write_nibble
 
 	jsr	ipc_read_byte
 
-	move.l	d0,d5			; Copy the status/count into d4
-	andi.b	#%00111111,d4		; Mask out the status bits
+	move.l	d0,d5			; Copy the status/count into d5
+	andi.b	#%00111111,d5		; Mask out the status bits
 	cmpi.b	#0,d5			; Are there any data bytes to read? 
 	beq	ipc_read_ser1_nodata
 
@@ -404,7 +407,7 @@ ipc_read_ser1:
 ipc_read_ser1_loop1:
 	jsr	ipc_read_byte
 	cmpi.w	#1023,d4		; Are we at the end of the buffer.
-	beq	ipc_read_ser1_skipbyte	; Yes? just drop the byte.
+	bge	ipc_read_ser1_skipbyte	; Yes? just drop the byte.
 
 	move.b	d0,(0,a0,d4)		; Copy the byte into the buffer
 	addi.w	#1,d4			; Increment the count.
@@ -425,18 +428,21 @@ ipc_read_ser2:
 	movem.l	d0-d7/a0-a6,-(SP)
 
 	lea	ser2_buffer,a0	; Put the base address of the ser2 buffer into a0
-	lea	kbd_buf_offset,a1
-	move.w	(a1),d4			; Load the current keyboard buffer counter into d4
+	lea	ser2_buf_count,a1
+	lea	sysvarbase,a2
+	addi.l	#1,sysv_intcount2(a2)
 
-	move.w	#$ffff,d1
+	move.w	(a1),d4			; Load the current ser2 buffer counter into d4
+
+	move.w	#$0fff,d1
 
 	move.l	#7,d0
 	jsr	ipc_write_nibble
 
 	jsr	ipc_read_byte
 
-	move.l	d0,d5			; Copy the status/count into d4
-	andi.b	#%00111111,d4		; Mask out the status bits
+	move.l	d0,d5			; Copy the status/count into d5
+	andi.b	#%00111111,d5			; Mask out the status bits
 	cmpi.b	#0,d5			; Are there any data bytes to read? 
 	beq	ipc_read_ser2_nodata
 
@@ -445,7 +451,7 @@ ipc_read_ser2:
 ipc_read_ser2_loop1:
 	jsr	ipc_read_byte
 	cmpi.w	#1023,d4		; Are we at the end of the buffer.
-	beq	ipc_read_ser2_skipbyte	; Yes? just drop the byte.
+	bge	ipc_read_ser2_skipbyte	; Yes? just drop the byte.
 
 	move.b	d0,(0,a0,d4)		; Copy the byte into the buffer
 	addi.w	#1,d4			; Increment the count.
@@ -456,5 +462,197 @@ ipc_read_ser2_skipbyte:
 	move.w	d4,(a1)			; Copy back the byte counter
 
 ipc_read_ser2_nodata:
+	movem.l	(SP)+,d0-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	open_ser1	-	Open ser1
+;
+;	Inputs:
+;
+;	None
+;
+;	Returns:
+;
+;	None
+;
+;*****************************************************************************
+
+open_ser1:
+	movem.l	d0-d7/a0-a6,-(SP)
+	move.w	#$0FFF,d1
+	lea	workspace,a0
+
+	lea	sysvarbase,a2
+	lea	ser1_buf_count,a3
+
+	move.w	#0,(a3)			; 	Clear the buffer counter.
+
+	move.l	#0,d0
+
+	move.b	#1,sysv_idisable(a2)	;	Disable IPC interrupt handling
+
+; Open ser1
+
+	move.b	#$2,d0
+	jsr	ipc_write_nibble
+
+	move.b	#0,sysv_idisable(a2)	;	Re-enable IPC interrupt handling
+
+
+	movem.l	(sp)+,d0-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	open_ser2	-	Open ser2
+;
+;	Inputs:
+;
+;	None
+;
+;	Returns:
+;
+;	None
+;
+;*****************************************************************************
+
+open_ser2:
+	movem.l	d0-d7/a0-a6,-(SP)
+	move.w	#$0FFF,d1
+	lea	workspace,a0
+
+	lea	sysvarbase,a2
+	lea	ser2_buf_count,a3
+
+	move.w	#0,(a3)			; 	Clear the buffer counter.
+
+	move.l	#0,d0
+
+	move.b	#1,sysv_idisable(a2)	;	Disable IPC interrupt handling
+
+; Open ser2
+
+	move.b	#$3,d0
+	jsr	ipc_write_nibble
+
+	move.b	#0,sysv_idisable(a2)	;	Re-enable IPC interrupt handling
+
+
+	movem.l	(sp)+,d0-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	close_ser1	-	Close ser1
+;
+;	Inputs:
+;
+;	None
+;
+;	Returns:
+;
+;	None
+;
+;*****************************************************************************
+
+close_ser1:
+	movem.l	d0-d7/a0-a6,-(SP)
+	move.w	#$0FFF,d1
+	lea	workspace,a0
+
+	lea	sysvarbase,a2
+	lea	ser1_buf_count,a3
+
+	move.w	#0,(a3)			; 	Clear the buffer counter.
+
+	move.l	#0,d0
+
+	move.b	#1,sysv_idisable(a2)	;	Disable IPC interrupt handling
+
+; Close ser1
+
+	move.b	#$4,d0
+	jsr	ipc_write_nibble
+
+	move.b	#0,sysv_idisable(a2)	;	Re-enable IPC interrupt handling
+
+
+	movem.l	(sp)+,d0-d7/a0-a6
+	rts
+
+;*****************************************************************************
+;
+;	close_ser2	-	Close ser2
+;
+;	Inputs:
+;
+;	None
+;
+;	Returns:
+;
+;	None
+;
+;*****************************************************************************
+
+close_ser2:
+	movem.l	d0-d7/a0-a6,-(SP)
+	move.w	#$0FFF,d1
+	lea	workspace,a0
+
+	lea	sysvarbase,a2
+	lea	ser2_buf_count,a3
+
+	move.w	#0,(a3)			; 	Clear the buffer counter.
+
+	move.l	#0,d0
+
+	move.b	#1,sysv_idisable(a2)	;	Disable IPC interrupt handling
+
+; Close ser2
+
+	move.b	#$5,d0
+	jsr	ipc_write_nibble
+
+	move.b	#0,sysv_idisable(a2)	;	Re-enable IPC interrupt handling
+
+
+	movem.l	(sp)+,d0-d7/a0-a6
+	rts
+;*****************************************************************************
+;
+;	set_imput_baud
+;
+;	Inputs:
+;
+;	d0.b		- Baud rate encoded as per IPC and ZX8302
+;
+;	Returns:
+;
+;	None
+;
+;*****************************************************************************
+
+set_input_baud:
+	movem.l	d0-d7/a0-a6,-(SP)
+
+	move.w	#$0FFF,d1
+
+	lea	sysvarbase,a2
+	move.b	#1,sysv_idisable(a2)	;	Disable IPC interrupt handling
+
+	move.l	#0,d2
+	move.b	d0,d2
+
+; Set the baud rate
+
+	move.b	#$d,d0
+	jsr	ipc_write_nibble
+
+	move.b	d2,d0
+	jsr	ipc_write_nibble
+
+	move.b	#0,sysv_idisable(a2)	;	Re-enable IPC interrupt handling
 	movem.l	(SP)+,d0-d7/a0-a6
 	rts

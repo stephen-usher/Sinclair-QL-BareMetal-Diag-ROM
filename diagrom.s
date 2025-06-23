@@ -1,6 +1,6 @@
 ; Sinclair QL BareMetal Diagnostic ROM
 ;
-; Version 0.00
+; Version 0.10
 ;
 ; Copyright 2025 Stephen Usher (and any other contributers listed below).
 ;
@@ -97,22 +97,25 @@ sysv_ramsiz	equ	$8
 sysv_ipcintreg	equ	$12
 sysv_intermask	equ	$14
 sysv_idisable	equ	$18
+sysv_intcount1	equ	$1c
+sysv_intcount2	equ	$20
+
 
 ;
 ; Keyboard buffer: 32 words
 ;
-kbd_buf_offset	equ	$000028200
-kbd_buffer	equ	$000028202
+kbd_buf_offset	equ	$000029200
+kbd_buffer	equ	$000029202
 ;
 ; Ser1 receive buffer: 1K
 ;
-ser1_buf_count	equ	$000028242	; One word.
-ser1_buffer	equ	$000028244	; 1024 bytes
+ser1_buf_count	equ	$000029242	; One word.
+ser1_buffer	equ	$000029244	; 1024 bytes
 ;
 ; Ser2 receive buffer: 1K
 ;
-ser2_buf_count	equ	$000028644	; One word.
-ser2_buffer	equ	$000028646	; 1024 bytes
+ser2_buf_count	equ	$000029644	; One word.
+ser2_buffer	equ	$000029646	; 1024 bytes
 
 workspace	equ	$00002a000	; Generic workspace.
 
@@ -178,7 +181,7 @@ start:
 
 	lea	zx83base,a0
 	move.b	#0,zx83off_vidreg(a0)	; Change to MODE 4
-;	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
+	move.b	#$0F,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
 	move.b	#%00001010,zx83off_w_transreg(a0)	; Set the ouput serial port settings (ser2, 4800 baud)
 	move.b	#$01,zx83off_w_ipcwreg(a0)	; Reset the IPC
 	move.b	#$00,zx83off_w_clock(a0)	; Reset the clock
@@ -205,9 +208,15 @@ endmemtst:
 	lea	zx83base,a0
 	move.b	#%00011111,zx83off_w_imaskreg(a0)	; Clear and disable interrupts
 	lea	sysvarbase,a0
-	move.b	#%00000000,sysv_intermask(a0)
 
-	move.b	#0,sysv_idisable(a0)	; Enable interrupts
+	move.l	#0,d0
+
+	move.b	d0,sysv_intermask(a0)
+	move.b	d0,sysv_idisable(a0)	; Enable interrupts
+
+	move.l	d0,sysv_intcount1(a0)
+	move.l	d0,sysv_intcount2(a0)
+
 	andi.w	#%1111100011111111,SR
 
 	bra	main
@@ -255,17 +264,26 @@ intvec7:
 
 	jsr	ipc_read_byte
 
-	btst	#0,d0
+	move.b	d0,d3
+	andi.b	#$01,d3
+	cmpi.b	#0,d3
+;	btst	#0,d0
 	beq	int_handler_notkbd
 	jsr	ipc_read_keyboard
 int_handler_notkbd:
 
-	btst	#4,d0
+	move.b	d0,d3
+	andi.b	#%00010000,d3
+	cmpi.b	#0,d3
+;	btst	#4,d0
 	beq	int_handler_notser1
 	jsr	ipc_read_ser1
 int_handler_notser1:
 
-	btst	#5,d0
+	move.b	d0,d3
+	andi.b	#%00100000,d3
+	cmpi.b	#0,d3
+;	btst	#5,d0
 	beq	int_handler_notser2
 	jsr	ipc_read_ser2
 int_handler_notser2:
@@ -310,6 +328,9 @@ main:
 	jsr	quick_test_clock
 
 	jsr	init_ipc_test		; Run the initial IPC tests.
+
+	lea	end_basic_test_txt,a0
+	jsr	prt_str
 
 	bra	end
 
