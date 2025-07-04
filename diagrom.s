@@ -1,6 +1,6 @@
 ; Sinclair QL BareMetal Diagnostic ROM
 ;
-; Version 0.10
+; Version 0.11
 ;
 ; Copyright 2025 Stephen Usher (and any other contributers listed below).
 ;

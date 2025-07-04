@@ -14,7 +14,7 @@ end_basic_test_txt:
 	dc.b	"Basic tests completed.",$0d,$0a,0
 
 bannertext:
-	dc.b	"QL Bare Metal Diagnostic ROM version 0.10",$0d,$0a,$0
+	dc.b	"QL Bare Metal Diagnostic ROM version 0.11",$0d,$0a,$0
 memtststarttxt:
 	dc.b	"Starting initial 128K memory test.",$0d,$0a,$0
 memerrtext:

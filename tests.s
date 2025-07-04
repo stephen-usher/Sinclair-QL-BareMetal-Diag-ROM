@@ -379,8 +379,12 @@ size_memory:
 
 	lea	extramstart,a1
 
-	moveq	#$0a,d3		; Put the test value 10101010 into d3
 sizememloop1:
+	move.b	#$aa,d3		; Put the test value 10101010 into d3
+	move.b	d3,(a1)		; Write test byte to memory
+	cmp.b	(a1),d3		; Compare what's inthis location with the test byte
+	bne	sizememloop1end	; If it's not the same then we've run out of RAM
+	move.b	#$55,d3		; Put the test value 01010101 into d3
 	move.b	d3,(a1)		; Write test byte to memory
 	cmp.b	(a1),d3		; Compare what's inthis location with the test byte
 	bne	sizememloop1end	; If it's not the same then we've run out of RAM
@@ -674,7 +678,7 @@ ext_mem_test_march_flip3_ok:
 
 ;*****************************************************************************
 ;
-;	ext_mem_test_march	- Expanded memory tests, march.
+;	ext_mem_test_erro	- Print memory error.
 ;
 ;	d3 holds the test data and a0 is the address.
 ;
@@ -691,7 +695,6 @@ ext_mem_test_error:
 	lea	workspace,a0
 
 	move.l	a1,d0
-	sub.l	#1,d0
 
 	jsr	ltoh
 	jsr	prt_str
