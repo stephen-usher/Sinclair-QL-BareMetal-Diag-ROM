@@ -385,12 +385,16 @@ sizememloop1:
 	move.b	#$aa,d3		; Put the test value 10101010 into d3
 	move.b	d3,(a1)		; Write test byte to memory
 	move.b	#0,(a2)		; Ground the data lines in case we get a phantom result due to flowing lines.
-	cmp.b	(a1),d3		; Compare what's in this location with the test byte
+	moveq	#0,d3
+	move.b	(a1),d3		; Copy the data into d3
+	cmpi.b	#$aa,d3		; Compare what's in this location with the test byte
 	bne	sizememloop1end	; If it's not the same then we've run out of RAM
 	move.b	#$55,d3		; Put the test value 01010101 into d3
 	move.b	d3,(a1)		; Write test byte to memory
 	move.b	#0,(a2)		; Ground the data lines in case we get a phantom result due to flowing lines.
-	cmp.b	(a1),d3		; Compare what's in this location with the test byte
+	moveq	#0,d3
+	move.b	(a1),d3		; Copy the memory data into d3
+	cmpi.b	#$55,d3		; Compare what's in this location with the test byte
 	bne	sizememloop1end	; If it's not the same then we've run out of RAM
 	add.l	#$1000,a1	; Add 4K to the address
 	jsr	prt_twiddle		; Print an X
